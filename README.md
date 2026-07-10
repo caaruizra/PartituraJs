@@ -1,42 +1,42 @@
 # PartituraJS
 
-PartituraJS es una librería JavaScript pequeña y sin dependencias para editar una partitura simple en el navegador usando SVG.
+PartituraJS is a small, dependency-free JavaScript library for editing a simple score in the browser using SVG.
 
-## Funciones incluidas
+## Included features
 
-- Render de pentagrama en SVG.
-- Agregar notas con clic.
-- Seleccionar, mover y borrar notas.
-- Duraciones básicas: corchea, negra y blanca desde la barra de herramientas.
-- Letra/sílaba por nota con doble clic.
+- Staff rendering in SVG.
+- Add notes with click.
+- Select, move, and delete notes.
+- Basic durations from the toolbar.
+- Lyric/syllable per note with double-click.
 - Undo/redo.
-- Reproducción simple con Web Audio API.
-- Exportación a JSON y MusicXML básico.
-- Sin framework: funciona con HTML, CSS y JavaScript plano.
+- Simple playback with Web Audio API.
+- Export to JSON and basic MusicXML.
+- Framework-free: works with plain HTML, CSS, and JavaScript.
 
-## Estructura interna
+## Internal structure
 
-- `dist/partitura-editor.js`: runtime legacy compatible (global en navegador + CommonJS en Node), regenerado desde `src/`.
-- `src/`: base modular activa.
-  - `src/core`: utilidades y constantes.
-  - `src/music`: teoria musical (pitch, duraciones, clave, accidentales).
-  - `src/model`: normalizacion y modelo de partitura.
-  - `src/services`: servicios de dominio (`musicxml`, `layout-engine`, `audio-player`).
-  - `src/render`: renderizado SVG (`score-renderer`, `notes`, `beams`, `svg`).
-  - `src/editor`: fachada `ScoreEditor` + controladores (`toolbar`, `keyboard`, `pointer`, `context-menu`).
-  - `src/MIGRATION_PLAN.md`: plan de migracion por fases.
+- `dist/partitura-editor.js`: legacy-compatible runtime (browser global + CommonJS in Node), regenerated from `src/`.
+- `src/`: active modular codebase.
+  - `src/core`: utilities and constants.
+  - `src/music`: music theory (pitch, durations, clef, accidentals).
+  - `src/model`: score normalization and model.
+  - `src/services`: domain services (`musicxml`, `layout-engine`, `audio-player`).
+  - `src/render`: SVG rendering (`score-renderer`, `notes`, `beams`, `svg`).
+  - `src/editor`: `ScoreEditor` facade + controllers (`toolbar`, `keyboard`, `pointer`, `context-menu`).
+  - `src/MIGRATION_PLAN.md`: phased migration plan.
 
-## Arquitectura modular actual
+## Current modular architecture
 
-La arquitectura actual ya esta separada por responsabilidades:
+The current architecture is already separated by responsibilities:
 
-- `ScoreEditor` (en `src/editor/ScoreEditor.js`) actua como fachada/orquestador.
-- Controllers de entrada en `src/editor/` manejan teclado, puntero/marquee, toolbar y menu contextual.
-- Render SVG en `src/render/` dibuja partitura, notas/silencios y beaming.
-- Servicios en `src/services/` resuelven export MusicXML, layout geometrico y reproduccion de audio.
-- Modelo y teoria musical en `src/model/` y `src/music/` concentran reglas de negocio puras.
+- `ScoreEditor` (in `src/editor/ScoreEditor.js`) acts as a facade/orchestrator.
+- Input controllers in `src/editor/` handle keyboard, pointer/marquee, toolbar, and context menu.
+- SVG rendering in `src/render/` draws the score, notes/rests, and beaming.
+- Services in `src/services/` handle MusicXML export, geometric layout, and audio playback.
+- Model and music theory in `src/model/` and `src/music/` contain pure business rules.
 
-## Uso rápido
+## Quick start
 
 ```html
 <link rel="stylesheet" href="./styles/partitura-editor.css">
@@ -45,8 +45,8 @@ La arquitectura actual ya esta separada por responsabilidades:
 <script>
   const editor = new PartituraJS.ScoreEditor('#editor', {
     score: {
-      title: 'Mi partitura',
-      composer: 'Yo',
+      title: 'My score',
+      composer: 'Me',
       measures: 4,
       timeSignature: { beats: 4, beatType: 4 },
       tempo: 90,
@@ -61,25 +61,25 @@ La arquitectura actual ya esta separada por responsabilidades:
 </script>
 ```
 
-## API principal
+## Main API
 
 ### `new PartituraJS.ScoreEditor(container, options)`
 
-`container` puede ser un selector CSS o un elemento DOM.
+`container` can be a CSS selector or a DOM element.
 
-Opciones útiles:
+Useful options:
 
-- `score`: objeto JSON de la partitura.
-- `measures`: cantidad de compases si no se entrega `score`.
-- `timeSignature`: por ejemplo `{ beats: 4, beatType: 4 }`.
-- `noteDuration`: duración inicial al agregar notas, en pulsos.
-- `mode`: `'write'` o `'select'`.
-- `readonly`: desactiva edición.
-- `showToolbar`: muestra u oculta la barra de herramientas.
-- `onChange(score, meta)`: callback al cambiar.
-- `onSelect(notes)`: callback al seleccionar.
+- `score`: score JSON object.
+- `measures`: number of measures if `score` is not provided.
+- `timeSignature`: for example `{ beats: 4, beatType: 4 }`.
+- `noteDuration`: initial duration when adding notes, in beats.
+- `mode`: `'write'` or `'select'`.
+- `readonly`: disables editing.
+- `showToolbar`: shows or hides the toolbar.
+- `onChange(score, meta)`: callback on changes.
+- `onSelect(notes)`: callback on selection.
 
-### Métodos
+### Methods
 
 - `editor.addNote(note)`
 - `editor.removeSelected()`
@@ -91,12 +91,12 @@ Opciones útiles:
 - `editor.play()`
 - `editor.setMode('write' | 'select')`
 
-## Modelo JSON
+## JSON model
 
 ```json
 {
-  "title": "Mi partitura",
-  "composer": "Yo",
+  "title": "My score",
+  "composer": "Me",
   "clef": "treble",
   "tempo": 90,
   "measures": 4,
@@ -114,66 +114,66 @@ Opciones útiles:
 }
 ```
 
-`measure` empieza en 0. `beat` también empieza en 0 dentro del compás. `duration` se expresa en pulsos: `1` equivale a una negra en 4/4.
+`measure` starts at 0. `beat` also starts at 0 inside each measure. `duration` is expressed in beats: `1` equals a quarter note in 4/4.
 
-## Limitaciones de esta versión
+## Limitations of this version
 
-Esta versión es una base editable, no un motor completo de notación musical. Aún no incluye ligaduras, silencios automáticos, armaduras visuales, múltiples voces, beams avanzados, compases compuestos complejos ni importación MusicXML completa.
+This version is an editable foundation, not a complete music notation engine. It does not yet include ties, automatic rests, visual key signatures, multiple voices, advanced beaming, complex compound meters, or full MusicXML import.
 
-## Ejecutar la demo
+## Run the demo
 
-Abre `demo.html` directamente en el navegador o sírvelo con un servidor local:
+Open `demo.html` directly in the browser or serve it with a local server:
 
 ```bash
 python3 -m http.server 8080
 ```
 
-Luego visita `http://localhost:8080/demo.html`.
+Then visit `http://localhost:8080/demo.html`.
 
-## Generar dist desde src
+## Build dist from src
 
-Instala dependencias y genera los bundles:
+Install dependencies and generate bundles:
 
 ```bash
 npm install
 npm run build
 ```
 
-Esto genera:
+This generates:
 
-- `dist/partitura-editor.js` (bundle legacy compatible)
-- `dist/partitura-modular.js` (IIFE para navegador)
+- `dist/partitura-editor.js` (legacy-compatible bundle)
+- `dist/partitura-modular.js` (IIFE for browser)
 - `dist/partitura-modular.cjs` (CommonJS)
 
-Para recompilar en modo watch:
+To rebuild in watch mode:
 
 ```bash
 npm run build:watch
 ```
 
-Para verificar automaticamente compatibilidad y regresiones principales:
+To automatically verify compatibility and key regressions:
 
 ```bash
 npm run verify
 ```
 
-`verify` ejecuta build y valida:
+`verify` runs build and validates:
 
-- exportaciones CommonJS esperadas
-- MusicXML con `<dot/>` y `<rest/>`
-- presencia de API global en el bundle IIFE
-- toggle nota/silencio por logica de tecla `R`
+- expected CommonJS exports
+- MusicXML with `<dot/>` and `<rest/>`
+- presence of global API in the IIFE bundle
+- note/rest toggle logic via `R` key
 
-La division interna de `ScoreEditor` por responsabilidades (renderer/controllers/layout/audio) sigue planificada en `src/MIGRATION_PLAN.md`.
+The internal `ScoreEditor` split by responsibilities (renderer/controllers/layout/audio) is tracked in `src/MIGRATION_PLAN.md`.
 
-## Uso de IA
+## AI usage
 
-Este proyecto se ha construido apoyado en el uso de COPILOT.
+This project was built with support from COPILOT.
 
-## Creador
+## Author
 
 Carlos Alejandro Ruiz Ramirez
 
-## Licencia
+## License
 
 MIT.

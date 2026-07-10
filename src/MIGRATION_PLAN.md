@@ -1,10 +1,10 @@
-# Modularizacion de PartituraJS
+# PartituraJS Modularization
 
-Este documento describe la migracion desde `dist/partitura-editor.js` (monolitico) hacia una estructura modular en `src/`.
+This document describes the migration from `dist/partitura-editor.js` (monolithic) to a modular structure in `src/`.
 
-## Estado actual
+## Current status
 
-Se extrajeron modulos puros:
+Pure modules were extracted:
 
 - `src/core/constants.js`
 - `src/core/utils.js`
@@ -17,63 +17,62 @@ Se extrajeron modulos puros:
 - `src/services/musicxml.js`
 - `src/index.js`
 
-Con esto, reglas de negocio y exportacion dejan de depender del DOM.
+With this, business rules and export logic are no longer DOM-dependent.
 
-Tambien se completo un paso puente:
+A bridge step was also completed:
 
-- `src/editor/ScoreEditor.js` contiene la clase `ScoreEditor` extraida del runtime legacy.
-- `scripts/build.mjs` ya regenera `dist/partitura-editor.js` desde `src/`.
-- El bundle legacy mantiene compatibilidad publica:
-	- API global: `window.PartituraJS`
+- `src/editor/ScoreEditor.js` contains the `ScoreEditor` class extracted from the legacy runtime.
+- `scripts/build.mjs` now regenerates `dist/partitura-editor.js` from `src/`.
+- The legacy bundle keeps public compatibility:
+	- Global API: `window.PartituraJS`
 	- CommonJS: `module.exports`
 
-Se completo el desacople principal de responsabilidades:
+The main responsibility decoupling is complete:
 
-- `src/services/layout-engine.js` con `buildMeasureLayout`, `buildBeamLayout`, `beatToX` y `noteToX`.
-- `src/services/audio-player.js` con `play`, `playNote`, `stopPlayback`, `tickPlayback`, `getPlaybackPosition`, `updatePlaybackCursor`, `removePlaybackCursor`.
-- `src/render/score-renderer.js`, `src/render/notes.js`, `src/render/beams.js` y `src/render/svg.js`.
+- `src/services/layout-engine.js` with `buildMeasureLayout`, `buildBeamLayout`, `beatToX`, and `noteToX`.
+- `src/services/audio-player.js` with `play`, `playNote`, `stopPlayback`, `tickPlayback`, `getPlaybackPosition`, `updatePlaybackCursor`, and `removePlaybackCursor`.
+- `src/render/score-renderer.js`, `src/render/notes.js`, `src/render/beams.js`, and `src/render/svg.js`.
 - `src/editor/toolbar-controller.js`, `src/editor/keyboard-controller.js`, `src/editor/pointer-controller.js`, `src/editor/context-menu-controller.js`.
-- `ScoreEditor` delega toolbar, keyboard, pointer/marquee, context menu, renderer, layout y audio.
+- `ScoreEditor` delegates toolbar, keyboard, pointer/marquee, context menu, renderer, layout, and audio.
 
-Con este estado, `ScoreEditor` funciona como fachada/orquestador, no como god class monolitica.
+At this stage, `ScoreEditor` works as a facade/orchestrator, not as a monolithic god class.
 
+Automated verification was also added:
 
-Ademas, se agrego verificacion automatizada:
+- `npm run verify` (`scripts/verify.mjs`) runs build and validates:
+	- expected CommonJS exports
+	- MusicXML with `<dot/>` and `<rest/>`
+	- presence of global API in the IIFE bundle
+	- note/rest toggle logic (`R` key)
 
-- `npm run verify` (`scripts/verify.mjs`) ejecuta build y valida:
-	- exportaciones CommonJS esperadas
-	- MusicXML con `<dot/>` y `<rest/>`
-	- presencia de API global en bundle IIFE
-	- logica de toggle nota/silencio (tecla `R`)
+## Recommended phase 2
 
-## Fase 2 recomendada
-
-Extraer `ScoreEditor` por responsabilidades:
+Extract `ScoreEditor` by responsibility:
 
 1. `src/editor/toolbar-controller.js`
 - `renderToolbar`, `renderMeasureToolbar`, `updateToolbar`, `updateMeasureToolbar`.
 
-Estado actual: extraido y `ScoreEditor` delega la logica de toolbar al controller.
+Current status: extracted and `ScoreEditor` delegates toolbar logic to this controller.
 
 2. `src/editor/keyboard-controller.js`
 - `bindKeyboard`, `handleKeyboardNavigation`, `transposeSelectedNotes`, `convertSelectedNoteToRest`.
 
-Estado actual: extraido y `ScoreEditor` delega estos metodos al controller.
+Current status: extracted and `ScoreEditor` delegates these methods to this controller.
 
 3. `src/editor/pointer-controller.js`
-- handlers de mouse/touch y marquee.
+- mouse/touch and marquee handlers.
 
-Estado actual: extraido (`onCanvasPointerDown`, `onCanvasDrop`, `onNotePointerDown`, `onPointerMove`, `onPointerUp`, context menu y marquee) y `ScoreEditor` delega al controller.
+Current status: extracted (`onCanvasPointerDown`, `onCanvasDrop`, `onNotePointerDown`, `onPointerMove`, `onPointerUp`, context menu, and marquee) and `ScoreEditor` delegates to this controller.
 
-Adicional:
+Additional:
 
-- `src/editor/context-menu-controller.js` encapsula render y acciones del menu contextual (compases y notas).
-- `ScoreEditor` delega `renderContextMenu`, `showContextMenu`, `showNoteContextMenu` y `hideContextMenu`.
+- `src/editor/context-menu-controller.js` encapsulates rendering and actions for the context menu (measures and notes).
+- `ScoreEditor` delegates `renderContextMenu`, `showContextMenu`, `showNoteContextMenu`, and `hideContextMenu`.
 
 4. `src/render/score-renderer.js`
 - `drawScore`, `drawNote`, `drawRest`, `drawBeams`.
 
-Estado actual: renderer migrado a modulos separados (`src/render/score-renderer.js`, `src/render/notes.js`, `src/render/beams.js` y `src/render/svg.js`).
+Current status: renderer migrated to separate modules (`src/render/score-renderer.js`, `src/render/notes.js`, `src/render/beams.js`, and `src/render/svg.js`).
 
 5. `src/services/layout-engine.js`
 - `buildMeasureLayout`, `buildBeamLayout`, `beatToX`, `noteToX`.
@@ -81,28 +80,28 @@ Estado actual: renderer migrado a modulos separados (`src/render/score-renderer.
 6. `src/services/audio-player.js`
 - `play`, `playNote`, `stopPlayback`, `tickPlayback`.
 
-Estado actual: extraido en `src/services/audio-player.js`, incluyendo cursor de reproduccion (`getPlaybackPosition`, `updatePlaybackCursor`, `removePlaybackCursor`), y `ScoreEditor` ya delega estas responsabilidades.
+Current status: extracted into `src/services/audio-player.js`, including playback cursor (`getPlaybackPosition`, `updatePlaybackCursor`, `removePlaybackCursor`), and `ScoreEditor` already delegates these responsibilities.
 
-Estado general de fase 2: completada.
+Overall phase 2 status: completed.
 
-## Fase 3 recomendada
+## Recommended phase 3
 
-Profundizar la separacion interna de `ScoreEditor` y consolidar la salida publica:
+Further deepen internal `ScoreEditor` separation and consolidate public outputs:
 
-- mantener `dist/partitura-editor.js` como salida principal compatible
-- decidir si `dist/partitura-modular.*` se mantiene como salida secundaria o se simplifica
+- keep `dist/partitura-editor.js` as the main compatible output
+- decide whether `dist/partitura-modular.*` remains a secondary output or is simplified
 
-Estado actual de pruebas automatizadas minimas:
+Current automated minimum test status:
 
-	- completado mediante `npm run verify` para:
-	- export MusicXML con puntillos y silencios
-	- toggle nota/silencio (toolbar y tecla `R`)
-	- compatibilidad de API (`require` y global)
+	- completed via `npm run verify` for:
+	- MusicXML export with dotted notes and rests
+	- note/rest toggle (toolbar and `R` key)
+	- API compatibility (`require` and global)
 
-Pendientes sugeridos de fase 3:
+Suggested remaining phase 3 tasks:
 
-- decidir estrategia final de distribucion (`partitura-editor.js` solamente vs tambien `partitura-modular.*`)
-- agregar pruebas de integracion UI (seleccion/marquee, drag de notas, context menu) para cubrir interaccion completa
-- estabilizar convencion de exports publicos en `src/index.js` y documentar superficie oficial de API
+- decide final distribution strategy (`partitura-editor.js` only vs also `partitura-modular.*`)
+- add UI integration tests (selection/marquee, note drag, context menu) to cover full interaction
+- stabilize public export conventions in `src/index.js` and document official API surface
 
-Mientras tanto, el runtime legacy se sigue generando desde `src/` con compatibilidad publica preservada.
+In the meantime, the legacy runtime is still generated from `src/` with preserved public compatibility.
