@@ -91,15 +91,15 @@ function configureLigatureButtons(editor, note) {
   if (tieEndButton) {
     tieEndButton.disabled = !note.pitch || !tiePending;
     tieEndButton.textContent = tiePending
-      ? 'Cerrar ligadura de tiempo aquí'
-      : 'Cerrar ligadura de tiempo aquí (sin inicio)';
+      ? editor.t('contextMenu.tieEndActive')
+      : editor.t('contextMenu.tieEndInactive');
   }
   if (slurStartButton) slurStartButton.disabled = !note.pitch;
   if (slurEndButton) {
     slurEndButton.disabled = !note.pitch || !slurPending;
     slurEndButton.textContent = slurPending
-      ? 'Cerrar ligadura de expresión aquí'
-      : 'Cerrar ligadura de expresión aquí (sin inicio)';
+      ? editor.t('contextMenu.slurEndActive')
+      : editor.t('contextMenu.slurEndInactive');
   }
   if (clearLigaturesButton) {
     clearLigaturesButton.disabled = !note.tieStart && !note.tieStop && !note.slurStart && !note.slurStop;
@@ -112,19 +112,19 @@ export function renderContextMenu(editor) {
   menu.hidden = true;
   menu.innerHTML = `
       <div class="partitura-context-menu-group" data-context-group="measure">
-        <button type="button" data-action="measure-insert-before">Agregar compás antes</button>
-        <button type="button" data-action="measure-insert-after">Agregar compás después</button>
-        <button type="button" data-action="measure-delete">Eliminar compás</button>
+        <button type="button" data-action="measure-insert-before">${editor.t('contextMenu.measureInsertBefore')}</button>
+        <button type="button" data-action="measure-insert-after">${editor.t('contextMenu.measureInsertAfter')}</button>
+        <button type="button" data-action="measure-delete">${editor.t('contextMenu.measureDelete')}</button>
       </div>
       <div class="partitura-context-menu-divider"></div>
       <div class="partitura-context-menu-group" data-context-group="note">
-        <button type="button" data-action="note-delete">Eliminar nota</button>
-        <button type="button" data-action="note-toggle-dot">Agregar puntillo</button>
-        <button type="button" data-action="note-tie-start">Iniciar ligadura de tiempo</button>
-        <button type="button" data-action="note-tie-end">Cerrar ligadura de tiempo aquí</button>
-        <button type="button" data-action="note-slur-start">Iniciar ligadura de expresión</button>
-        <button type="button" data-action="note-slur-end">Cerrar ligadura de expresión aquí</button>
-        <button type="button" data-action="note-clear-ligatures">Quitar ligaduras de esta nota</button>
+        <button type="button" data-action="note-delete">${editor.t('contextMenu.noteDelete')}</button>
+        <button type="button" data-action="note-toggle-dot">${editor.t('contextMenu.noteToggleDotAdd')}</button>
+        <button type="button" data-action="note-tie-start">${editor.t('contextMenu.tieStart')}</button>
+        <button type="button" data-action="note-tie-end">${editor.t('contextMenu.tieEndInactive')}</button>
+        <button type="button" data-action="note-slur-start">${editor.t('contextMenu.slurStart')}</button>
+        <button type="button" data-action="note-slur-end">${editor.t('contextMenu.slurEndInactive')}</button>
+        <button type="button" data-action="note-clear-ligatures">${editor.t('contextMenu.clearLigatures')}</button>
       </div>
     `;
 
@@ -178,7 +178,9 @@ export function showNoteContextMenu(editor, noteId, event) {
   const noteDotButton = editor.contextMenu.querySelector('[data-action="note-toggle-dot"]');
   if (noteDotButton) {
     noteDotButton.hidden = false;
-    noteDotButton.textContent = isDottedDuration(note.duration) ? 'Quitar puntillo' : 'Agregar puntillo';
+    noteDotButton.textContent = isDottedDuration(note.duration)
+      ? editor.t('contextMenu.noteToggleDotRemove')
+      : editor.t('contextMenu.noteToggleDotAdd');
   }
   configureLigatureButtons(editor, note);
 

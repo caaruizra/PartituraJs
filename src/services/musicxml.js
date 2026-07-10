@@ -85,9 +85,9 @@ function ensureDomParser() {
   return DomParserCtor;
 }
 
-function createParsedScore(scoreRoot, measureCount) {
+function createParsedScore(scoreRoot, measureCount, defaultTitle = 'Untitled') {
   return {
-    title: textOf(scoreRoot, 'work > work-title') || 'Sin título',
+    title: textOf(scoreRoot, 'work > work-title') || defaultTitle,
     composer: textOf(scoreRoot, 'identification > creator[type="composer"]') || '',
     tempo: 90,
     measures: Math.max(1, measureCount),
@@ -168,7 +168,7 @@ function parseMeasureNotes(measure, measureIndex, divisions) {
   return notes;
 }
 
-export function importMusicXML(xmlSource) {
+export function importMusicXML(xmlSource, options = {}) {
   const DomParserCtor = ensureDomParser();
   const parser = new DomParserCtor();
   const doc = parser.parseFromString(String(xmlSource || ''), 'application/xml');
@@ -181,7 +181,8 @@ export function importMusicXML(xmlSource) {
   if (!part) throw new Error('No se encontró ningún part en MusicXML');
 
   const measures = [...part.querySelectorAll(':scope > measure')];
-  const parsed = createParsedScore(scoreRoot, measures.length);
+  const parsed = createParsedScore(scoreRoot, measures.length, options.defaultTitle);
+  if (options.defaultTitle) parsed.title = options.defaultTitle;
   applyTempo(scoreRoot, parsed);
 
   let divisions = 1;

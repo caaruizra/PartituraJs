@@ -58,13 +58,16 @@ import {
 } from '../render/notes.js';
 import { drawScore as drawScoreFromRenderer } from '../render/score-renderer.js';
 import { createSvg } from '../render/svg.js';
+import { createTranslator, normalizeLanguage } from '../i18n/index.js';
 
 const global = typeof window !== 'undefined' ? window : globalThis;
 
 export class ScoreEditor {
   constructor(container, options = {}) {
     const element = typeof container === 'string' ? document.querySelector(container) : container;
-    if (!element) throw new Error('ScoreEditor necesita un contenedor válido.');
+    const initialLanguage = normalizeLanguage(options.language);
+    this.t = createTranslator(initialLanguage);
+    if (!element) throw new Error(this.t('editor.invalidContainer'));
 
     this.container = element;
     this.options = {
@@ -80,6 +83,7 @@ export class ScoreEditor {
       readonly: !!options.readonly,
       showToolbar: options.showToolbar !== false,
       noteKind: options.noteKind === 'rest' ? 'rest' : 'note',
+      language: initialLanguage,
       onChange: options.onChange || null,
       onSelect: options.onSelect || null,
       onPlayNote: options.onPlayNote || null
@@ -89,7 +93,7 @@ export class ScoreEditor {
       measures: options.measures || 4,
       timeSignature: options.timeSignature || { beats: 4, beatType: 4 },
       notes: options.notes || []
-    });
+    }, { defaultTitle: this.t('score.untitled') });
     this.selectedIds = new Set();
     this.selectedMeasure = null;
     this.undoStack = [];
@@ -123,6 +127,7 @@ export class ScoreEditor {
     this.container.innerHTML = '';
     this.container.classList.add('partitura-editor');
     this.container.tabIndex = 0;
+    document.documentElement.lang = this.options.language;
 
     this.renderMeasureToolbar();
 
@@ -300,7 +305,7 @@ export class ScoreEditor {
   editNote(id) {
     const note = this.model.getNote(id);
     if (!note) return;
-    const value = prompt('Letra/sílaba para esta nota:', note.lyric || '');
+    const value = prompt(this.t('editor.lyricPrompt'), note.lyric || '');
     if (value === null) return;
     this.pushHistory();
     this.model.updateNote(id, { lyric: value });
@@ -310,10 +315,10 @@ export class ScoreEditor {
 
   editTitle() {
     const currentTitle = this.model.score.title || '';
-    const value = prompt('Título de la partitura:', currentTitle);
+    const value = prompt(this.t('editor.titlePrompt'), currentTitle);
     if (value === null) return;
     this.pushHistory();
-    this.model.setScore({ ...this.model.toJSON(), title: value.trim() || 'Sin título' });
+    this.model.setScore({ ...this.model.toJSON(), title: value.trim() || this.t('score.untitled') }, { defaultTitle: this.t('score.untitled') });
     this.selectedIds.clear();
     this.hideContextMenu();
     this.emitChange();
@@ -550,7 +555,7 @@ export class ScoreEditor {
 
   setScore(score) {
     this.pushHistory();
-    this.model.setScore(score);
+    this.model.setScore(score, { defaultTitle: this.t('score.untitled') });
     this.selectedIds.clear();
     this.pendingTieStart = null;
     this.pendingSlurStart = null;
@@ -581,9 +586,17 @@ export class ScoreEditor {
   }
 
   importMusicXML(xmlSource) {
-    const score = importMusicXML(xmlSource);
+    const score = importMusicXML(xmlSource, { defaultTitle: this.t('score.untitled') });
     this.setScore(score);
     return score;
+  }
+
+  setLanguage(language) {
+    const normalized = normalizeLanguage(language);
+    if (normalized === this.options.language) return;
+    this.options.language = normalized;
+    this.t = createTranslator(normalized);
+    this.render();
   }
 
   pushHistory() {

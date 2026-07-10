@@ -11,29 +11,78 @@
     .panel { background: white; border: 1px solid #dbe3ef; border-radius: 16px; padding: 18px; }
     textarea { box-sizing: border-box; height: 180px; margin-top: 14px; width: 100%; }
     .actions { display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+    .demo-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .demo-language { display: flex; align-items: center; gap: 8px; }
     button { cursor: pointer; }
   </style>
 </head>
 <body>
   <main>
-    <h1>PartituraJS</h1>
-    <p>Haz clic en el pentagrama para crear notas. Arrástralas para cambiar tono o posición. Arrastra una clave de Sol, Fa o Do sobre el pentagrama para cambiar la clave.</p>
+    <div class="demo-topbar">
+      <h1 id="title">PartituraJS</h1>
+      <label class="demo-language" for="language">
+        <span id="language-label">Idioma</span>
+        <select id="language">
+          <option value="es">Español</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+    </div>
+    <p id="intro">Haz clic en el pentagrama para crear notas. Arrástralas para cambiar tono o posición. Arrastra una clave de Sol, Fa o Do sobre el pentagrama para cambiar la clave.</p>
     <div id="editor" class="panel"></div>
     <div class="actions">
       <button id="json">Mostrar JSON</button>
       <button id="musicxml">Descargar MusicXML</button>
     </div>
-    <label for="output" style="display:block;margin-top:12px;">Salida JSON</label>
+    <label id="output-label" for="output" style="display:block;margin-top:12px;">Salida JSON</label>
     <textarea id="output" spellcheck="false" placeholder="Aquí aparecerá el JSON"></textarea>
   </main>
 
   <script src="./dist/partitura-editor.js"></script>
   <script>
+    const copy = {
+      es: {
+        title: 'PartituraJS',
+        intro: 'Haz clic en el pentagrama para crear notas. Arrástralas para cambiar tono o posición. Arrastra una clave de Sol, Fa o Do sobre el pentagrama para cambiar la clave.',
+        json: 'Mostrar JSON',
+        musicxml: 'Descargar MusicXML',
+        outputLabel: 'Salida JSON',
+        outputPlaceholder: 'Aquí aparecerá el JSON',
+        languageLabel: 'Idioma'
+      },
+      en: {
+        title: 'PartituraJS',
+        intro: 'Click the staff to create notes. Drag them to change pitch or position. Drag a treble, bass, or C clef onto the staff to change the clef.',
+        json: 'Show JSON',
+        musicxml: 'Download MusicXML',
+        outputLabel: 'JSON output',
+        outputPlaceholder: 'The JSON will appear here',
+        languageLabel: 'Language'
+      }
+    };
+
+    function applyDemoLanguage(language) {
+      const locale = language === 'en' ? 'en' : 'es';
+      const labels = copy[locale];
+      document.documentElement.lang = locale;
+      document.querySelector('#title').textContent = labels.title;
+      document.querySelector('#intro').textContent = labels.intro;
+      document.querySelector('#json').textContent = labels.json;
+      document.querySelector('#musicxml').textContent = labels.musicxml;
+      document.querySelector('#output-label').textContent = labels.outputLabel;
+      document.querySelector('#output').placeholder = labels.outputPlaceholder;
+      document.querySelector('#language-label').textContent = labels.languageLabel;
+    }
+
+    const savedLanguage = localStorage.getItem('partitura-demo-language') || 'es';
+    applyDemoLanguage(savedLanguage);
+
     const editor = new PartituraJS.ScoreEditor('#editor', {
       title: 'Himno de la alegría',
       clef: 'sol',
       measures: 7,
       timeSignature: { beats: 4, beatType: 4 },
+      language: savedLanguage,
       score: {
         title: 'Himno de la alegría',
         composer: 'Demo',
@@ -83,6 +132,14 @@
       onChange(score) {
         document.querySelector('#output').value = JSON.stringify(score, null, 2);
       }
+    });
+
+    document.querySelector('#language').value = savedLanguage;
+    document.querySelector('#language').addEventListener('change', (event) => {
+      const language = event.target.value === 'en' ? 'en' : 'es';
+      localStorage.setItem('partitura-demo-language', language);
+      applyDemoLanguage(language);
+      editor.setLanguage(language);
     });
 
     document.querySelector('#json').addEventListener('click', () => {

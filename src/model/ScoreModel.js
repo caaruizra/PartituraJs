@@ -5,8 +5,8 @@ import { noteSortValue } from '../music/pitch.js';
 import { normalizeScore } from './normalizeScore.js';
 
 export class ScoreModel {
-  constructor(score) {
-    this.score = normalizeScore(score);
+  constructor(score, options = {}) {
+    this.score = normalizeScore(score, options);
     this.normalizeAllMeasureBeats();
   }
 
@@ -207,8 +207,8 @@ export class ScoreModel {
     return this.score.notes.find((note) => note.id === id) || null;
   }
 
-  setScore(score) {
-    this.score = normalizeScore(score);
+  setScore(score, options = {}) {
+    this.score = normalizeScore(score, options);
     this.normalizeAllMeasureBeats();
   }
 

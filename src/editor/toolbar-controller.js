@@ -3,13 +3,13 @@ export function renderMeasureToolbar(editor) {
   toolbar.className = 'partitura-measure-toolbar';
   toolbar.innerHTML = `
       <div class="partitura-measure-toolbar-group">
-        <button type="button" data-action="mode-write" title="Agregar notas">✎ Insertar</button>
-        <button type="button" data-action="mode-select" title="Seleccionar y mover">↖ Seleccionar</button>
-        <button type="button" data-action="delete" title="Borrar selección">Borrar</button>
-        <button type="button" data-action="undo" title="Deshacer">↶ Deshacer</button>
-        <button type="button" data-action="redo" title="Rehacer">↷ Rehacer</button>
-        <button type="button" data-action="play" title="Reproducir">▶ Reproducir</button>
-        <button type="button" data-action="stop" title="Detener" hidden>■ Detener</button>
+        <button type="button" data-action="mode-write" title="${editor.t('toolbar.measureInsert')}">✎ ${editor.t('toolbar.measureInsert')}</button>
+        <button type="button" data-action="mode-select" title="${editor.t('toolbar.measureSelect')}">↖ ${editor.t('toolbar.measureSelect')}</button>
+        <button type="button" data-action="delete" title="${editor.t('toolbar.deleteSelection')}">${editor.t('toolbar.deleteSelection')}</button>
+        <button type="button" data-action="undo" title="${editor.t('toolbar.undo')}">↶ ${editor.t('toolbar.undo')}</button>
+        <button type="button" data-action="redo" title="${editor.t('toolbar.redo')}">↷ ${editor.t('toolbar.redo')}</button>
+        <button type="button" data-action="play" title="${editor.t('toolbar.play')}">▶ ${editor.t('toolbar.play')}</button>
+        <button type="button" data-action="stop" title="${editor.t('toolbar.stop')}" hidden>■ ${editor.t('toolbar.stop')}</button>
       </div>
     `;
   toolbar.addEventListener('click', (event) => {
@@ -33,21 +33,21 @@ export function renderToolbar(editor, layout) {
   const toolbar = document.createElement('div');
   toolbar.className = 'partitura-toolbar';
   toolbar.innerHTML = `
-      <div class="partitura-toolbar-group partitura-toolbar-durations" aria-label="Duración de nota">
-        <button type="button" data-action="toggle-note-kind" title="Cambiar a silencio" aria-label="Cambiar a silencio"><span class="partitura-music-glyph">𝄽</span><span>Nota</span></button>
-        <button type="button" data-action="duration-4" title="Redonda" aria-label="Redonda"><span class="partitura-music-glyph">𝅝</span></button>
-        <button type="button" data-action="duration-2" title="Blanca" aria-label="Blanca"><span class="partitura-music-glyph">𝅗𝅥</span></button>
-        <button type="button" data-action="duration-1" title="Negra" aria-label="Negra"><span class="partitura-music-glyph">𝅘𝅥</span></button>
-        <button type="button" data-action="duration-0.5" title="Corchea" aria-label="Corchea"><span class="partitura-music-glyph">𝅘𝅥𝅮</span></button>
-        <button type="button" data-action="duration-0.25" title="Semicorchea" aria-label="Semicorchea"><span class="partitura-music-glyph">𝅘𝅥𝅯</span></button>
-        <button type="button" data-action="duration-0.125" title="Fusa" aria-label="Fusa"><span class="partitura-music-glyph">𝅘𝅥𝅰</span></button>
-        <button type="button" data-action="duration-0.0625" title="Semifusa" aria-label="Semifusa"><span class="partitura-music-glyph">𝅘𝅥𝅱</span></button>
+      <div class="partitura-toolbar-group partitura-toolbar-durations" aria-label="${editor.t('toolbar.noteDuration')}">
+        <button type="button" data-action="toggle-note-kind" title="${editor.t('toolbar.toggleToRest')}" aria-label="${editor.t('toolbar.toggleToRest')}"><span class="partitura-music-glyph">𝄽</span><span>${editor.t('toolbar.note')}</span></button>
+        <button type="button" data-action="duration-4" title="${editor.t('durations.whole')}" aria-label="${editor.t('durations.whole')}"><span class="partitura-music-glyph">𝅝</span></button>
+        <button type="button" data-action="duration-2" title="${editor.t('durations.half')}" aria-label="${editor.t('durations.half')}"><span class="partitura-music-glyph">𝅗𝅥</span></button>
+        <button type="button" data-action="duration-1" title="${editor.t('durations.quarter')}" aria-label="${editor.t('durations.quarter')}"><span class="partitura-music-glyph">𝅘𝅥</span></button>
+        <button type="button" data-action="duration-0.5" title="${editor.t('durations.eighth')}" aria-label="${editor.t('durations.eighth')}"><span class="partitura-music-glyph">𝅘𝅥𝅮</span></button>
+        <button type="button" data-action="duration-0.25" title="${editor.t('durations.sixteenth')}" aria-label="${editor.t('durations.sixteenth')}"><span class="partitura-music-glyph">𝅘𝅥𝅯</span></button>
+        <button type="button" data-action="duration-0.125" title="${editor.t('durations.thirtySecond')}" aria-label="${editor.t('durations.thirtySecond')}"><span class="partitura-music-glyph">𝅘𝅥𝅰</span></button>
+        <button type="button" data-action="duration-0.0625" title="${editor.t('durations.sixtyFourth')}" aria-label="${editor.t('durations.sixtyFourth')}"><span class="partitura-music-glyph">𝅘𝅥𝅱</span></button>
       </div>
-      <div class="partitura-toolbar-footer" aria-label="Otras opciones">
-        <div class="partitura-toolbar-group partitura-toolbar-clefs" aria-label="Clave">
-          <button type="button" data-action="clef-sol" data-clef="sol" draggable="true" title="Clave de Sol" aria-label="Clave de Sol"><span class="partitura-music-glyph">𝄞</span><span>Sol</span></button>
-          <button type="button" data-action="clef-fa" data-clef="fa" draggable="true" title="Clave de Fa" aria-label="Clave de Fa"><span class="partitura-music-glyph">𝄢</span><span>Fa</span></button>
-          <button type="button" data-action="clef-do" data-clef="do" draggable="true" title="Clave de Do" aria-label="Clave de Do"><span class="partitura-music-glyph">𝄡</span><span>Do</span></button>
+      <div class="partitura-toolbar-footer" aria-label="${editor.t('toolbar.otherOptions')}">
+        <div class="partitura-toolbar-group partitura-toolbar-clefs" aria-label="${editor.t('toolbar.clef')}">
+          <button type="button" data-action="clef-sol" data-clef="sol" draggable="true" title="${editor.t('toolbar.clefSol')}" aria-label="${editor.t('toolbar.clefSol')}"><span class="partitura-music-glyph">𝄞</span><span>Sol</span></button>
+          <button type="button" data-action="clef-fa" data-clef="fa" draggable="true" title="${editor.t('toolbar.clefFa')}" aria-label="${editor.t('toolbar.clefFa')}"><span class="partitura-music-glyph">𝄢</span><span>Fa</span></button>
+          <button type="button" data-action="clef-do" data-clef="do" draggable="true" title="${editor.t('toolbar.clefDo')}" aria-label="${editor.t('toolbar.clefDo')}"><span class="partitura-music-glyph">𝄡</span><span>Do</span></button>
         </div>
       </div>
     `;
@@ -80,11 +80,11 @@ export function updateToolbar(editor) {
   if (noteKindButton) {
     const isRest = editor.options.noteKind === 'rest';
     noteKindButton.classList.toggle('is-active', isRest);
-    noteKindButton.title = isRest ? 'Cambiar a nota' : 'Cambiar a silencio';
+    noteKindButton.title = isRest ? editor.t('toolbar.toggleToNote') : editor.t('toolbar.toggleToRest');
     noteKindButton.setAttribute('aria-label', noteKindButton.title);
     noteKindButton.innerHTML = isRest
-      ? '<span class="partitura-music-glyph">𝄽</span><span>Silencio</span>'
-      : '<span class="partitura-music-glyph">𝄽</span><span>Nota</span>';
+      ? `<span class="partitura-music-glyph">𝄽</span><span>${editor.t('toolbar.rest')}</span>`
+      : `<span class="partitura-music-glyph">𝄽</span><span>${editor.t('toolbar.note')}</span>`;
   }
   const selectedNote = editor.selectedIds.size === 1
     ? editor.model.getNote([...editor.selectedIds][0])

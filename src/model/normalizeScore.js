@@ -1,11 +1,12 @@
 import { uid } from '../core/utils.js';
 import { normalizeClef } from '../music/clef.js';
 
-export function normalizeScore(score = {}) {
+export function normalizeScore(score = {}, options = {}) {
+  const defaultTitle = options.defaultTitle || 'Untitled';
   const measures = Math.max(1, Number(score.measures || 4));
   const timeSignature = score.timeSignature || { beats: 4, beatType: 4 };
   return {
-    title: score.title || 'Sin título',
+    title: score.title || defaultTitle,
     composer: score.composer || '',
     clef: normalizeClef(score.clef),
     key: score.key || { fifths: 0 },

@@ -3,6 +3,7 @@ export const version = '0.1.0';
 // Public editor API
 export { ScoreEditor } from './editor/ScoreEditor.js';
 export { exportMusicXML, importMusicXML } from './services/musicxml.js';
+export { createTranslator, normalizeLanguage, translations } from './i18n/index.js';
 
 // Data/model helpers
 export { ScoreModel } from './model/ScoreModel.js';

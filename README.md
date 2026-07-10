@@ -78,6 +78,7 @@ Useful options:
 - `mode`: `'write'` or `'select'`.
 - `readonly`: disables editing.
 - `showToolbar`: shows or hides the toolbar.
+- `language`: `'es'` or `'en'`; defaults to Spanish.
 - `onChange(score, meta)`: callback on changes.
 - `onSelect(notes)`: callback on selection.
 
@@ -86,6 +87,7 @@ Useful options:
 - `editor.addNote(note)`
 - `editor.removeSelected()`
 - `editor.setScore(score)`
+- `editor.setLanguage('es' | 'en')`
 - `editor.toJSON()`
 - `editor.exportMusicXML()`
 - `editor.importMusicXML(xmlString)`
