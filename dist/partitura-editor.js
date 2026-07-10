@@ -1245,8 +1245,8 @@
       if (type !== 'whole') {
         const beamed = noteBeamInfo?.get(note.id) || null;
         const stemUp = beamed ? beamed.stemUp : y >= staffTop + 2 * this.options.staffSpacing;
-        const stemX = beamed ? beamed.stemX : (stemUp ? x + 7 : x - 7);
-        const stemEnd = beamed ? beamed.stemEnd : (stemUp ? y - 36 : y + 36);
+        const stemX = beamed ? beamed.stemX : (stemUp ? x + 8 : x - 8);
+        const stemEnd = beamed ? beamed.stemEnd : (stemUp ? y - 40 : y + 40);
         group.appendChild(createSvg('line', {
           x1: stemX,
           y1: y,
