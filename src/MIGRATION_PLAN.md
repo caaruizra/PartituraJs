@@ -27,19 +27,24 @@ Tambien se completo un paso puente:
 	- API global: `window.PartituraJS`
 	- CommonJS: `module.exports`
 
-Y un paso de desacople adicional:
+Se completo el desacople principal de responsabilidades:
 
-- Se extrajo `src/services/layout-engine.js` con `buildMeasureLayout`, `buildBeamLayout`, `beatToX` y `noteToX`.
-- `ScoreEditor` ahora delega ese calculo al modulo de layout en lugar de contener toda la logica geométrica.
+- `src/services/layout-engine.js` con `buildMeasureLayout`, `buildBeamLayout`, `beatToX` y `noteToX`.
+- `src/services/audio-player.js` con `play`, `playNote`, `stopPlayback`, `tickPlayback`, `getPlaybackPosition`, `updatePlaybackCursor`, `removePlaybackCursor`.
+- `src/render/score-renderer.js`, `src/render/notes.js`, `src/render/beams.js` y `src/render/svg.js`.
+- `src/editor/toolbar-controller.js`, `src/editor/keyboard-controller.js`, `src/editor/pointer-controller.js`, `src/editor/context-menu-controller.js`.
+- `ScoreEditor` delega toolbar, keyboard, pointer/marquee, context menu, renderer, layout y audio.
 
-Y un avance inicial de renderer:
+Con este estado, `ScoreEditor` funciona como fachada/orquestador, no como god class monolitica.
 
-- Se extrajo `src/render/beams.js` con el render de barras y flags de grupos beameados.
-- Se extrajo `src/render/notes.js` con `drawNote` y `drawRest`.
-- Se extrajo `src/render/score-renderer.js` con `drawScore`.
-- Se extrajo `src/render/svg.js` con `createSvg` compartido.
-- `ScoreEditor.drawBeams()` ahora delega al modulo de renderer.
-- `ScoreEditor.drawNote()`, `ScoreEditor.drawRest()` y `ScoreEditor.drawScore()` ahora delegan al renderer.
+
+Ademas, se agrego verificacion automatizada:
+
+- `npm run verify` (`scripts/verify.mjs`) ejecuta build y valida:
+	- exportaciones CommonJS esperadas
+	- MusicXML con `<dot/>` y `<rest/>`
+	- presencia de API global en bundle IIFE
+	- logica de toggle nota/silencio (tecla `R`)
 
 ## Fase 2 recomendada
 
@@ -78,17 +83,26 @@ Estado actual: renderer migrado a modulos separados (`src/render/score-renderer.
 
 Estado actual: extraido en `src/services/audio-player.js`, incluyendo cursor de reproduccion (`getPlaybackPosition`, `updatePlaybackCursor`, `removePlaybackCursor`), y `ScoreEditor` ya delega estas responsabilidades.
 
+Estado general de fase 2: completada.
+
 ## Fase 3 recomendada
 
 Profundizar la separacion interna de `ScoreEditor` y consolidar la salida publica:
 
 - mantener `dist/partitura-editor.js` como salida principal compatible
 - decidir si `dist/partitura-modular.*` se mantiene como salida secundaria o se simplifica
-- agregar pruebas automatizadas minimas para validar:
+
+Estado actual de pruebas automatizadas minimas:
+
+	- completado mediante `npm run verify` para:
 	- export MusicXML con puntillos y silencios
 	- toggle nota/silencio (toolbar y tecla `R`)
 	- compatibilidad de API (`require` y global)
 
-Estado actual: agregado `npm run verify` (`scripts/verify.mjs`) que valida estos tres puntos sobre los bundles de `dist/`.
+Pendientes sugeridos de fase 3:
 
-Mientras tanto, `src/editor/ScoreEditor.js` funciona como modulo puente (aun monolitico internamente).
+- decidir estrategia final de distribucion (`partitura-editor.js` solamente vs tambien `partitura-modular.*`)
+- agregar pruebas de integracion UI (seleccion/marquee, drag de notas, context menu) para cubrir interaccion completa
+- estabilizar convencion de exports publicos en `src/index.js` y documentar superficie oficial de API
+
+Mientras tanto, el runtime legacy se sigue generando desde `src/` con compatibilidad publica preservada.
