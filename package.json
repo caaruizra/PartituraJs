@@ -1,0 +1,20 @@
+{
+  "name": "partitura-js",
+  "version": "0.1.0",
+  "description": "Editor básico de partituras en SVG para navegador, sin dependencias.",
+  "main": "dist/partitura-editor.js",
+  "files": [
+    "dist",
+    "styles",
+    "demo.html",
+    "README.md"
+  ],
+  "keywords": [
+    "music",
+    "score",
+    "svg",
+    "notation",
+    "partitura"
+  ],
+  "license": "MIT"
+}

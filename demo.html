@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Demo PartituraJS</title>
+  <link rel="stylesheet" href="./styles/partitura-editor.css" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 28px; background: #f1f5f9; }
+    main { max-width: 1080px; margin: auto; }
+    .panel { background: white; border: 1px solid #dbe3ef; border-radius: 16px; padding: 18px; }
+    textarea { box-sizing: border-box; height: 180px; margin-top: 14px; width: 100%; }
+    .actions { display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>PartituraJS</h1>
+    <p>Haz clic en el pentagrama para crear notas. Arrástralas para cambiar tono o posición. Arrastra una clave de Sol, Fa o Do sobre el pentagrama para cambiar la clave.</p>
+    <div id="editor" class="panel"></div>
+    <div class="actions">
+      <button id="json">Mostrar JSON</button>
+      <button id="musicxml">Descargar MusicXML</button>
+    </div>
+    <label for="output" style="display:block;margin-top:12px;">Salida JSON</label>
+    <textarea id="output" spellcheck="false" placeholder="Aquí aparecerá el JSON"></textarea>
+  </main>
+
+  <script src="./dist/partitura-editor.js"></script>
+  <script>
+    const editor = new PartituraJS.ScoreEditor('#editor', {
+      title: 'Himno de la alegría',
+      clef: 'sol',
+      measures: 7,
+      timeSignature: { beats: 4, beatType: 4 },
+      score: {
+        title: 'Himno de la alegría',
+        composer: 'Demo',
+        measures: 7,
+        tempo: 96,
+        notes: [
+          { measure: 0, beat: 0, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 0, beat: 1, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 0, beat: 2, duration: 1, pitch: { step: 'F', octave: 4 } },
+          { measure: 0, beat: 3, duration: 1, pitch: { step: 'G', octave: 4 } },
+          { measure: 1, beat: 0, duration: 1, pitch: { step: 'G', octave: 4 } },
+          { measure: 1, beat: 1, duration: 1, pitch: { step: 'F', octave: 4 } },
+          { measure: 1, beat: 2, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 1, beat: 3, duration: 1, pitch: { step: 'D', octave: 4 } },
+          { measure: 2, beat: 0, duration: 1, pitch: { step: 'C', octave: 4 } },
+          { measure: 2, beat: 1, duration: 1, pitch: { step: 'C', octave: 4 } },
+          { measure: 2, beat: 2, duration: 1, pitch: { step: 'D', octave: 4 } },
+          { measure: 2, beat: 3, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 3, beat: 0, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 3, beat: 1, duration: 1, pitch: { step: 'D', octave: 4 } },
+
+          { measure: 3, beat: 2, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 3, beat: 3, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 4, beat: 0, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 4, beat: 1, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 4, beat: 2, duration: 1, pitch: { step: 'F', octave: 4 } },
+          { measure: 4, beat: 3, duration: 1, pitch: { step: 'G', octave: 4 } },
+          { measure: 5, beat: 0, duration: 1, pitch: { step: 'G', octave: 4 } },
+          { measure: 5, beat: 1, duration: 1, pitch: { step: 'F', octave: 4 } },
+          { measure: 5, beat: 2, duration: 1, pitch: { step: 'E', octave: 4 } },
+          { measure: 5, beat: 3, duration: 1, pitch: { step: 'D', octave: 4 } },
+          { measure: 6, beat: 0, duration: 1, pitch: { step: 'C', octave: 4 } },
+          { measure: 6, beat: 1, duration: 1, pitch: { step: 'C', octave: 4 } },
+          { measure: 6, beat: 2, duration: 1, pitch: { step: 'D', octave: 4 } },
+          { measure: 6, beat: 3, duration: 1, pitch: { step: 'C', octave: 4 } },
+        ]
+      },
+      onChange(score) {
+        document.querySelector('#output').value = JSON.stringify(score, null, 2);
+      }
+    });
+
+    document.querySelector('#json').addEventListener('click', () => {
+      document.querySelector('#output').value = JSON.stringify(editor.toJSON(), null, 2);
+    });
+
+    document.querySelector('#musicxml').addEventListener('click', () => {
+      const blob = new Blob([editor.exportMusicXML()], { type: 'application/vnd.recordare.musicxml+xml' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'partitura.musicxml';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  </script>
+</body>
+</html>

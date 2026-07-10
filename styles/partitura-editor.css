@@ -1,0 +1,373 @@
+.partitura-editor {
+  --pe-border: #d6d9e0;
+  --pe-bg: #ffffff;
+  --pe-panel: #f7f8fb;
+  --pe-text: #1f2937;
+  --pe-muted: #6b7280;
+  --pe-accent: #2563eb;
+  --pe-selection: #f59e0b;
+  background: var(--pe-bg);
+  border: 1px solid var(--pe-border);
+  border-radius: 14px;
+  color: var(--pe-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  position: relative;
+  padding: 12px;
+}
+
+.partitura-measure-toolbar {
+  align-items: center;
+  background: var(--pe-panel);
+  border: 1px solid var(--pe-border);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px;
+}
+
+.partitura-measure-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.partitura-measure-toolbar-measures {
+  flex: 1 1 100%;
+}
+
+.partitura-measure-toolbar button {
+  background: #fff;
+  border: 1px solid var(--pe-border);
+  border-radius: 10px;
+  color: var(--pe-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 7px 10px;
+}
+
+.partitura-toolbar button[data-action^="duration-"],
+.partitura-toolbar button[data-action="mode-write"],
+.partitura-toolbar button[data-action="mode-select"] {
+  font-family: "Noto Music", "Bravura", "DejaVu Sans", "Segoe UI Symbol", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.partitura-music-glyph {
+  display: inline-block;
+  font-size: 1.05em;
+  line-height: 1;
+  margin-right: 0.35em;
+  min-width: 1em;
+  text-align: center;
+}
+
+.partitura-measure-toolbar button:hover:not(:disabled) {
+  border-color: var(--pe-accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, .12);
+}
+
+.partitura-measure-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.partitura-context-menu {
+  background: #fff;
+  border: 1px solid var(--pe-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .16);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  left: 0;
+  min-width: 220px;
+  padding: 6px;
+  position: absolute;
+  top: 0;
+  z-index: 80;
+}
+
+.partitura-context-menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.partitura-context-menu-divider {
+  border-top: 1px solid #e5e7eb;
+  margin: 4px 0;
+}
+
+.partitura-context-menu[hidden] {
+  display: none;
+}
+
+.partitura-context-menu button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--pe-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.partitura-context-menu button:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #dbe3ef;
+}
+
+.partitura-context-menu button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.partitura-layout {
+  display: flex;
+  gap: 12px;
+  min-height: 260px;
+}
+
+.partitura-canvas {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.partitura-toolbar {
+  align-self: stretch;
+  background: var(--pe-panel);
+  border: 1px solid var(--pe-border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 164px;
+  padding: 8px;
+}
+
+.partitura-toolbar-group,
+.partitura-toolbar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.partitura-toolbar-clefs button {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+  min-height: 58px;
+  user-select: none;
+}
+
+.partitura-toolbar-clefs .partitura-music-glyph {
+  min-width: 1.1em;
+}
+
+.partitura-toolbar-durations {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.partitura-toolbar button {
+  background: #fff;
+  border: 1px solid var(--pe-border);
+  border-radius: 10px;
+  color: var(--pe-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 7px 10px;
+}
+
+.partitura-toolbar-durations button {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 58px;
+  padding: 10px 8px;
+}
+
+.partitura-toolbar button:hover,
+.partitura-toolbar button.is-active {
+  border-color: var(--pe-accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, .12);
+}
+
+.partitura-svg {
+  display: block;
+  min-width: 720px;
+  touch-action: none;
+}
+
+@media (max-width: 900px) {
+  .partitura-layout {
+    flex-direction: column;
+  }
+
+  .partitura-toolbar {
+    min-width: 0;
+  }
+
+  .partitura-toolbar-group,
+  .partitura-toolbar-footer {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .partitura-toolbar button {
+    flex: 1 0 120px;
+  }
+
+  .partitura-toolbar-durations {
+    overflow-y: visible;
+  }
+
+  .partitura-toolbar-durations button {
+    min-height: 52px;
+  }
+}
+
+.partitura-title {
+  font-size: 18px;
+  font-weight: 700;
+  cursor: text;
+}
+
+.partitura-composer {
+  fill: var(--pe-muted);
+  font-size: 13px;
+}
+
+.partitura-staff-line,
+.partitura-bar-line,
+.partitura-ledger-line,
+.partitura-stem {
+  stroke: #111827;
+  stroke-linecap: round;
+}
+
+.partitura-staff-line,
+.partitura-ledger-line {
+  stroke-width: 1.2;
+}
+
+.partitura-bar-line {
+
+.partitura-playback-cursor {
+  stroke: var(--pe-accent);
+  stroke-width: 3;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.partitura-playback-cursor-base {
+  stroke: #ffffff;
+  stroke-width: 7;
+  pointer-events: none;
+}
+  stroke-width: 1.4;
+}
+
+.partitura-beat-guide {
+  display: none;
+}
+
+.partitura-measure-invalid {
+  fill: rgba(220, 38, 38, .08);
+  stroke: #dc2626;
+  stroke-width: 1.2;
+}
+
+.partitura-measure-selected {
+  fill: rgba(37, 99, 235, .08);
+  stroke: #2563eb;
+  stroke-width: 1.2;
+}
+
+.partitura-clef {
+  font-family: "Bravura", "Noto Music", "Times New Roman", serif;
+  font-size: 70px;
+}
+
+.partitura-time {
+  font-family: Georgia, serif;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.partitura-note {
+  cursor: grab;
+}
+
+.partitura-note:active {
+  cursor: grabbing;
+}
+
+.partitura-notehead {
+  fill: #fff;
+  stroke: #111827;
+  stroke-width: 1.8;
+}
+
+.partitura-notehead.is-filled {
+  fill: #111827;
+}
+
+.partitura-note-dot {
+  fill: #111827;
+  pointer-events: none;
+}
+
+.partitura-note-selection-box {
+  fill: rgba(245, 158, 11, 0.12);
+  stroke: var(--pe-selection);
+  stroke-width: 1.6;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.partitura-marquee-selection {
+  fill: rgba(37, 99, 235, 0.12);
+  stroke: var(--pe-accent);
+  stroke-width: 1.2;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+}
+
+.partitura-note.is-selected .partitura-notehead {
+  fill: var(--pe-selection);
+  stroke: #92400e;
+}
+
+.partitura-stem,
+.partitura-flag {
+  fill: none;
+  stroke: #111827;
+  stroke-width: 2.4;
+}
+
+.partitura-beam {
+  stroke: #111827;
+  stroke-linecap: butt;
+  stroke-width: 5.4;
+}
+
+.partitura-accidental {
+  font-family: Georgia, serif;
+  font-size: 20px;
+}
+
+.partitura-lyric {
+  fill: var(--pe-muted);
+  font-size: 12px;
+}
