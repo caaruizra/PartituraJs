@@ -1,5 +1,5 @@
 import { ScoreModel } from '../model/ScoreModel.js';
-import { exportMusicXML } from '../services/musicxml.js';
+import { exportMusicXML, importMusicXML } from '../services/musicxml.js';
 import { clamp, roundToGrid } from '../core/utils.js';
 import { clefConfig } from '../music/clef.js';
 import {
@@ -107,6 +107,8 @@ export class ScoreEditor {
     this.contextMenuMeasure = null;
     this.contextMenuNote = null;
     this.contextMenu = null;
+    this.pendingTieStart = null;
+    this.pendingSlurStart = null;
     this.boundHideContextMenu = (event) => {
       if (!this.contextMenu || this.contextMenu.hidden) return;
       if (event.target.closest('.partitura-context-menu')) return;
@@ -426,12 +428,112 @@ export class ScoreEditor {
   removeSelected() {
     if (!this.selectedIds.size) return;
     this.pushHistory();
+    const selected = new Set(this.selectedIds);
     this.model.removeNotes([...this.selectedIds]);
+    if (this.pendingTieStart && selected.has(this.pendingTieStart)) this.pendingTieStart = null;
+    if (this.pendingSlurStart && selected.has(this.pendingSlurStart)) this.pendingSlurStart = null;
     this.selectedIds.clear();
     this.emitChange();
     this.updateToolbar();
     this.updateMeasureToolbar();
     this.drawScore();
+  }
+
+  compareNoteOrder(a, b) {
+    return (a.measure - b.measure) || (a.beat - b.beat);
+  }
+
+  startTie(noteId) {
+    const note = this.model.getNote(noteId);
+    if (!note?.pitch) return false;
+    this.pushHistory();
+    const updated = this.model.updateNote(noteId, { tieStart: true });
+    if (!updated) {
+      this.undoStack.pop();
+      return false;
+    }
+    this.pendingTieStart = noteId;
+    this.emitChange();
+    this.drawScore();
+    return true;
+  }
+
+  endTie(noteId) {
+    const endNote = this.model.getNote(noteId);
+    const startNote = this.pendingTieStart ? this.model.getNote(this.pendingTieStart) : null;
+    if (!endNote?.pitch || !startNote?.pitch) return false;
+    if (this.compareNoteOrder(startNote, endNote) >= 0) return false;
+    const samePitch = startNote.pitch.step === endNote.pitch.step
+      && (startNote.pitch.alter || 0) === (endNote.pitch.alter || 0)
+      && startNote.pitch.octave === endNote.pitch.octave;
+    if (!samePitch) return false;
+
+    this.pushHistory();
+    const updatedStart = this.model.updateNote(startNote.id, { tieStart: true });
+    const updatedEnd = this.model.updateNote(endNote.id, { tieStop: true });
+    if (!updatedStart || !updatedEnd) {
+      this.undoStack.pop();
+      return false;
+    }
+    this.pendingTieStart = null;
+    this.emitChange();
+    this.drawScore();
+    return true;
+  }
+
+  startSlur(noteId) {
+    const note = this.model.getNote(noteId);
+    if (!note?.pitch) return false;
+    this.pushHistory();
+    const updated = this.model.updateNote(noteId, { slurStart: true });
+    if (!updated) {
+      this.undoStack.pop();
+      return false;
+    }
+    this.pendingSlurStart = noteId;
+    this.emitChange();
+    this.drawScore();
+    return true;
+  }
+
+  endSlur(noteId) {
+    const endNote = this.model.getNote(noteId);
+    const startNote = this.pendingSlurStart ? this.model.getNote(this.pendingSlurStart) : null;
+    if (!endNote?.pitch || !startNote?.pitch) return false;
+    if (this.compareNoteOrder(startNote, endNote) >= 0) return false;
+
+    this.pushHistory();
+    const updatedStart = this.model.updateNote(startNote.id, { slurStart: true });
+    const updatedEnd = this.model.updateNote(endNote.id, { slurStop: true });
+    if (!updatedStart || !updatedEnd) {
+      this.undoStack.pop();
+      return false;
+    }
+    this.pendingSlurStart = null;
+    this.emitChange();
+    this.drawScore();
+    return true;
+  }
+
+  clearLigatures(noteId) {
+    const note = this.model.getNote(noteId);
+    if (!note) return false;
+    this.pushHistory();
+    const updated = this.model.updateNote(noteId, {
+      tieStart: false,
+      tieStop: false,
+      slurStart: false,
+      slurStop: false
+    });
+    if (!updated) {
+      this.undoStack.pop();
+      return false;
+    }
+    if (this.pendingTieStart === noteId) this.pendingTieStart = null;
+    if (this.pendingSlurStart === noteId) this.pendingSlurStart = null;
+    this.emitChange();
+    this.drawScore();
+    return true;
   }
 
   addNote(note) {
@@ -450,6 +552,8 @@ export class ScoreEditor {
     this.pushHistory();
     this.model.setScore(score);
     this.selectedIds.clear();
+    this.pendingTieStart = null;
+    this.pendingSlurStart = null;
     this.setSelectedMeasure(null);
     this.hideContextMenu();
     this.emitChange();
@@ -476,6 +580,12 @@ export class ScoreEditor {
     return exportMusicXML(this.toJSON());
   }
 
+  importMusicXML(xmlSource) {
+    const score = importMusicXML(xmlSource);
+    this.setScore(score);
+    return score;
+  }
+
   pushHistory() {
     this.undoStack.push(this.model.toJSON());
     if (this.undoStack.length > 100) this.undoStack.shift();
@@ -488,6 +598,8 @@ export class ScoreEditor {
     this.redoStack.push(current);
     this.model.setScore(this.undoStack.at(-1));
     this.selectedIds.clear();
+    this.pendingTieStart = null;
+    this.pendingSlurStart = null;
     this.hideContextMenu();
     if (this.selectedMeasure !== null && this.selectedMeasure >= this.model.score.measures) {
       this.setSelectedMeasure(this.model.score.measures - 1);
@@ -504,6 +616,8 @@ export class ScoreEditor {
     this.undoStack.push(state);
     this.model.setScore(state);
     this.selectedIds.clear();
+    this.pendingTieStart = null;
+    this.pendingSlurStart = null;
     this.hideContextMenu();
     if (this.selectedMeasure !== null && this.selectedMeasure >= this.model.score.measures) {
       this.setSelectedMeasure(this.model.score.measures - 1);

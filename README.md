@@ -9,9 +9,11 @@ PartituraJS is a small, dependency-free JavaScript library for editing a simple 
 - Select, move, and delete notes.
 - Basic durations from the toolbar.
 - Lyric/syllable per note with double-click.
+- Note ties (time ligatures) and slurs (expression ligatures).
 - Undo/redo.
 - Simple playback with Web Audio API.
 - Export to JSON and basic MusicXML.
+- Import from basic MusicXML (including ties and slurs).
 - Framework-free: works with plain HTML, CSS, and JavaScript.
 
 ## Internal structure
@@ -86,10 +88,13 @@ Useful options:
 - `editor.setScore(score)`
 - `editor.toJSON()`
 - `editor.exportMusicXML()`
+- `editor.importMusicXML(xmlString)`
 - `editor.undo()`
 - `editor.redo()`
 - `editor.play()`
 - `editor.setMode('write' | 'select')`
+
+`importMusicXML` is also exported at module level to parse XML without creating an editor instance.
 
 ## JSON model
 
@@ -108,7 +113,11 @@ Useful options:
       "beat": 0,
       "duration": 1,
       "pitch": { "step": "C", "octave": 4, "alter": 0 },
-      "lyric": ""
+      "lyric": "",
+      "tieStart": false,
+      "tieStop": false,
+      "slurStart": false,
+      "slurStop": false
     }
   ]
 }
@@ -118,7 +127,7 @@ Useful options:
 
 ## Limitations of this version
 
-This version is an editable foundation, not a complete music notation engine. It does not yet include ties, automatic rests, visual key signatures, multiple voices, advanced beaming, complex compound meters, or full MusicXML import.
+This version is an editable foundation, not a complete music notation engine. It does not yet include automatic rests, visual key signatures, multiple voices, advanced beaming, complex compound meters, or full MusicXML coverage.
 
 ## Run the demo
 

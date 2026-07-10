@@ -1,5 +1,130 @@
 import { clefConfig } from '../music/clef.js';
+import { noteSortValue } from '../music/pitch.js';
 import { createSvg } from './svg.js';
+
+function noteOrder(a, b) {
+  return (a.measure - b.measure) || (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b));
+}
+
+function pitchKey(note) {
+  if (!note.pitch) return '';
+  return `${note.pitch.step}:${note.pitch.alter || 0}:${note.pitch.octave}`;
+}
+
+function buildLigaturePairs(score) {
+  const ordered = [...score.notes].sort(noteOrder);
+  const ties = [];
+  const slurs = [];
+  const openTieByPitch = new Map();
+  const openSlurs = [];
+
+  const handleTieStop = (note) => {
+    const queue = openTieByPitch.get(pitchKey(note)) || [];
+    const from = queue.shift();
+    if (from) ties.push({ from: from.id, to: note.id });
+  };
+  const handleTieStart = (note) => {
+    const queue = openTieByPitch.get(pitchKey(note)) || [];
+    queue.push(note);
+    openTieByPitch.set(pitchKey(note), queue);
+  };
+  const handleSlurStop = (note) => {
+    const from = openSlurs.pop();
+    if (from) slurs.push({ from: from.id, to: note.id });
+  };
+
+  for (const note of ordered) {
+    if (note.tieStop && note.pitch) handleTieStop(note);
+    if (note.tieStart && note.pitch) handleTieStart(note);
+    if (note.slurStop) handleSlurStop(note);
+
+    if (note.slurStart) openSlurs.push(note);
+  }
+
+  return { ties, slurs };
+}
+
+function buildSystemMap(systems) {
+  const map = new Map();
+  for (let idx = 0; idx < systems.length; idx++) {
+    for (const measure of systems[idx].measureIndices) map.set(measure, idx);
+  }
+  return map;
+}
+
+function buildArcPath(x1, y1, x2, y2, arcHeight, direction) {
+  const midX = (x1 + x2) / 2;
+  const midpointY = (y1 + y2) / 2;
+  const controlY = midpointY + (direction === 'up' ? -arcHeight : arcHeight);
+  return `M ${x1} ${y1} Q ${midX} ${controlY} ${x2} ${y2}`;
+}
+
+function drawLigatureSegment(group, segment) {
+  if (!Number.isFinite(segment.fromX) || !Number.isFinite(segment.toX) || segment.toX - segment.fromX < 10) return;
+  group.appendChild(createSvg('path', {
+    d: buildArcPath(segment.fromX, segment.fromY, segment.toX, segment.toY, segment.arcHeight, segment.direction),
+    class: segment.cssClass
+  }));
+}
+
+function drawLigatures(editor, system, systemIndex, systemMap, pairs, notesById, ligatureType) {
+  const group = createSvg('g', { class: `partitura-ligatures partitura-${ligatureType}-group` });
+  const top = system.staffTop;
+  const left = editor.options.staffLeft;
+  const startMeasure = system.measureIndices[0];
+  const endMeasure = system.measureIndices[system.measureIndices.length - 1];
+  const systemLeft = editor.measureLayout.starts[startMeasure];
+  const systemRight = editor.measureLayout.starts[endMeasure] + editor.measureLayout.widths[endMeasure];
+  const noteOffset = ligatureType === 'tie' ? 7 : 18;
+  const arcHeight = ligatureType === 'tie' ? 12 : 20;
+  const direction = ligatureType === 'tie' ? 'down' : 'up';
+  const cssClass = ligatureType === 'tie' ? 'partitura-tie' : 'partitura-slur';
+
+  const drawSegment = (fromX, toX, fromY, toY) => {
+    drawLigatureSegment(group, {
+      fromX,
+      toX,
+      fromY,
+      toY,
+      cssClass,
+      direction,
+      arcHeight
+    });
+  };
+
+  const resolveSegment = (from, to, fromSystem, toSystem, fromY, toY) => {
+    const centerY = top + 2 * editor.options.staffSpacing;
+    const startX = Math.max(left + 8, systemLeft + 6);
+    if (fromSystem === toSystem && systemIndex === fromSystem) {
+      return { fromX: editor.noteToX(from) + 8, toX: editor.noteToX(to) - 8, fromY, toY };
+    }
+    if (systemIndex === fromSystem) {
+      return { fromX: editor.noteToX(from) + 8, toX: systemRight - 6, fromY, toY: fromY };
+    }
+    if (systemIndex === toSystem) {
+      return { fromX: startX, toX: editor.noteToX(to) - 8, fromY: toY, toY };
+    }
+    return { fromX: startX, toX: systemRight - 6, fromY: centerY, toY: centerY };
+  };
+
+  for (const pair of pairs) {
+    const from = notesById.get(pair.from);
+    const to = notesById.get(pair.to);
+    if (!from?.pitch || !to?.pitch) continue;
+
+    const fromSystem = systemMap.get(from.measure);
+    const toSystem = systemMap.get(to.measure);
+    if (fromSystem === undefined || toSystem === undefined) continue;
+    if (systemIndex < fromSystem || systemIndex > toSystem) continue;
+
+    const fromY = editor.pitchToY(from.pitch, top) + (direction === 'up' ? -noteOffset : noteOffset);
+    const toY = editor.pitchToY(to.pitch, top) + (direction === 'up' ? -noteOffset : noteOffset);
+    const segment = resolveSegment(from, to, fromSystem, toSystem, fromY, toY);
+    drawSegment(segment.fromX, segment.toX, segment.fromY, segment.toY);
+  }
+
+  return group;
+}
 
 export function drawScore(editor) {
   editor.svg.innerHTML = '';
@@ -8,7 +133,10 @@ export function drawScore(editor) {
   const left = s.staffLeft;
   editor.measureLayout = editor.buildMeasureLayout();
   const measureValidation = editor.model.measureValidation();
+  const ligatures = buildLigaturePairs(score);
+  const notesById = new Map(score.notes.map((note) => [note.id, note]));
   const systems = editor.measureLayout.systems || [];
+  const systemMap = buildSystemMap(systems);
   const staffRight = editor.measureLayout.staffRight;
   const canvasWidth = Math.max(editor.canvas?.clientWidth || editor.options.width, staffRight + 40);
   const lastSystem = systems.at(-1) || { staffTop: s.staffTop };
@@ -35,7 +163,8 @@ export function drawScore(editor) {
     }, score.composer));
   }
 
-  for (const system of systems) {
+  for (let systemIndex = 0; systemIndex < systems.length; systemIndex++) {
+    const system = systems[systemIndex];
     const top = system.staffTop;
     const bottomLine = editor.bottomLineY(top);
     const systemMeasures = system.measureIndices;
@@ -150,6 +279,11 @@ export function drawScore(editor) {
     }
     notesGroup.appendChild(editor.drawBeams(beamLayout.groups));
     editor.svg.appendChild(notesGroup);
+
+    const tieGroup = drawLigatures(editor, system, systemIndex, systemMap, ligatures.ties, notesById, 'tie');
+    const slurGroup = drawLigatures(editor, system, systemIndex, systemMap, ligatures.slurs, notesById, 'slur');
+    editor.svg.appendChild(tieGroup);
+    editor.svg.appendChild(slurGroup);
   }
 
   if (editor.selectionBox) {

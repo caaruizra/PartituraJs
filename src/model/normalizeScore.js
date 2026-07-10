@@ -26,7 +26,11 @@ export function normalizeScore(score = {}) {
         alter: Number(note.pitch.alter || 0)
       } : null,
       lyric: note.lyric || '',
-      velocity: Number(note.velocity || 80)
+      velocity: Number(note.velocity || 80),
+      tieStart: !!note.tieStart,
+      tieStop: !!note.tieStop,
+      slurStart: !!note.slurStart,
+      slurStop: !!note.slurStop
     })) : []
   };
 }

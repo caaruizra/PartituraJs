@@ -35,6 +35,8 @@ function handleNoteDeleteAction(editor) {
   editor.pushHistory();
   const removed = editor.model.removeNote(editor.contextMenuNote);
   if (removed) {
+    if (editor.pendingTieStart === editor.contextMenuNote) editor.pendingTieStart = null;
+    if (editor.pendingSlurStart === editor.contextMenuNote) editor.pendingSlurStart = null;
     editor.selectedIds.delete(editor.contextMenuNote);
     editor.emitChange();
     editor.drawScore();
@@ -67,7 +69,41 @@ function handleMenuAction(editor, action) {
   const isMeasureAction = handleMeasureAction(editor, action);
   if (!isMeasureAction && action === 'note-delete') handleNoteDeleteAction(editor);
   if (!isMeasureAction && action === 'note-toggle-dot') handleToggleDotAction(editor);
+  if (!isMeasureAction && action === 'note-tie-start') editor.startTie(editor.contextMenuNote);
+  if (!isMeasureAction && action === 'note-tie-end') editor.endTie(editor.contextMenuNote);
+  if (!isMeasureAction && action === 'note-slur-start') editor.startSlur(editor.contextMenuNote);
+  if (!isMeasureAction && action === 'note-slur-end') editor.endSlur(editor.contextMenuNote);
+  if (!isMeasureAction && action === 'note-clear-ligatures') editor.clearLigatures(editor.contextMenuNote);
   hideContextMenu(editor);
+}
+
+function configureLigatureButtons(editor, note) {
+  const tieStartButton = editor.contextMenu.querySelector('[data-action="note-tie-start"]');
+  const tieEndButton = editor.contextMenu.querySelector('[data-action="note-tie-end"]');
+  const slurStartButton = editor.contextMenu.querySelector('[data-action="note-slur-start"]');
+  const slurEndButton = editor.contextMenu.querySelector('[data-action="note-slur-end"]');
+  const clearLigaturesButton = editor.contextMenu.querySelector('[data-action="note-clear-ligatures"]');
+
+  const tiePending = editor.pendingTieStart ? editor.model.getNote(editor.pendingTieStart) : null;
+  const slurPending = editor.pendingSlurStart ? editor.model.getNote(editor.pendingSlurStart) : null;
+
+  if (tieStartButton) tieStartButton.disabled = !note.pitch;
+  if (tieEndButton) {
+    tieEndButton.disabled = !note.pitch || !tiePending;
+    tieEndButton.textContent = tiePending
+      ? 'Cerrar ligadura de tiempo aquí'
+      : 'Cerrar ligadura de tiempo aquí (sin inicio)';
+  }
+  if (slurStartButton) slurStartButton.disabled = !note.pitch;
+  if (slurEndButton) {
+    slurEndButton.disabled = !note.pitch || !slurPending;
+    slurEndButton.textContent = slurPending
+      ? 'Cerrar ligadura de expresión aquí'
+      : 'Cerrar ligadura de expresión aquí (sin inicio)';
+  }
+  if (clearLigaturesButton) {
+    clearLigaturesButton.disabled = !note.tieStart && !note.tieStop && !note.slurStart && !note.slurStop;
+  }
 }
 
 export function renderContextMenu(editor) {
@@ -84,6 +120,11 @@ export function renderContextMenu(editor) {
       <div class="partitura-context-menu-group" data-context-group="note">
         <button type="button" data-action="note-delete">Eliminar nota</button>
         <button type="button" data-action="note-toggle-dot">Agregar puntillo</button>
+        <button type="button" data-action="note-tie-start">Iniciar ligadura de tiempo</button>
+        <button type="button" data-action="note-tie-end">Cerrar ligadura de tiempo aquí</button>
+        <button type="button" data-action="note-slur-start">Iniciar ligadura de expresión</button>
+        <button type="button" data-action="note-slur-end">Cerrar ligadura de expresión aquí</button>
+        <button type="button" data-action="note-clear-ligatures">Quitar ligaduras de esta nota</button>
       </div>
     `;
 
@@ -139,6 +180,7 @@ export function showNoteContextMenu(editor, noteId, event) {
     noteDotButton.hidden = false;
     noteDotButton.textContent = isDottedDuration(note.duration) ? 'Quitar puntillo' : 'Agregar puntillo';
   }
+  configureLigatureButtons(editor, note);
 
   editor.contextMenu.hidden = false;
   positionMenu(editor, event);

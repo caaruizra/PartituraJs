@@ -2,7 +2,7 @@ export const version = '0.1.0';
 
 // Public editor API
 export { ScoreEditor } from './editor/ScoreEditor.js';
-export { exportMusicXML } from './services/musicxml.js';
+export { exportMusicXML, importMusicXML } from './services/musicxml.js';
 
 // Data/model helpers
 export { ScoreModel } from './model/ScoreModel.js';

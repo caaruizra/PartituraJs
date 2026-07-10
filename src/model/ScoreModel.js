@@ -84,13 +84,18 @@ export class ScoreModel {
         alter: Number(note.pitch.alter || 0)
       } : null,
       lyric: note.lyric || '',
-      velocity: Number(note.velocity || 80)
+      velocity: Number(note.velocity || 80),
+      tieStart: !!note.tieStart,
+      tieStop: !!note.tieStop,
+      slurStart: !!note.slurStart,
+      slurStop: !!note.slurStop
     };
     next.beat = clamp(next.beat, 0, this.score.timeSignature.beats - 0.25);
     if (!this.canFitInMeasure(next.measure, next.duration)) return null;
     this.shiftNotesOnInsert(next.measure, next.beat, next.duration);
     this.score.notes.push(next);
     this.normalizeMeasureBeats(next.measure);
+    this.normalizeLigatures();
     this.sort();
     return next;
   }
@@ -124,10 +129,52 @@ export class ScoreModel {
     note.measure = nextMeasure;
     note.beat = nextBeat;
     note.duration = nextDuration;
+    if (Object.hasOwn(patch, 'tieStart')) note.tieStart = !!patch.tieStart;
+    if (Object.hasOwn(patch, 'tieStop')) note.tieStop = !!patch.tieStop;
+    if (Object.hasOwn(patch, 'slurStart')) note.slurStart = !!patch.slurStart;
+    if (Object.hasOwn(patch, 'slurStop')) note.slurStop = !!patch.slurStop;
     this.normalizeMeasureBeats(nextMeasure);
     if (previousMeasure !== nextMeasure) this.normalizeMeasureBeats(previousMeasure);
+    this.normalizeLigatures();
     this.sort();
     return note;
+  }
+
+  normalizeLigatures() {
+    const ordered = [...this.score.notes]
+      .sort((a, b) => (a.measure - b.measure) || (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b)));
+
+    const openTieByPitch = new Map();
+    const openSlurs = [];
+
+    const pitchKey = (note) => `${note.pitch.step}:${note.pitch.alter || 0}:${note.pitch.octave}`;
+    const handleTieStop = (note) => {
+      const queue = openTieByPitch.get(pitchKey(note)) || [];
+      if (!queue.length) note.tieStop = false;
+      else queue.shift();
+    };
+    const handleTieStart = (note) => {
+      const queue = openTieByPitch.get(pitchKey(note)) || [];
+      queue.push(note.id);
+      openTieByPitch.set(pitchKey(note), queue);
+    };
+    const handleSlurStop = (note) => {
+      if (!openSlurs.length) note.slurStop = false;
+      else openSlurs.pop();
+    };
+
+    for (const note of ordered) {
+      if (!note.pitch) {
+        note.tieStart = false;
+        note.tieStop = false;
+      }
+
+      if (note.tieStop && note.pitch) handleTieStop(note);
+      if (note.tieStart && note.pitch) handleTieStart(note);
+      if (note.slurStop) handleSlurStop(note);
+
+      if (note.slurStart) openSlurs.push(note.id);
+    }
   }
 
   removeNote(id) {
@@ -138,6 +185,7 @@ export class ScoreModel {
     this.score.notes = this.score.notes.filter((n) => n.id !== id);
     if (this.score.notes.length !== before) {
       this.normalizeMeasureBeats(measure);
+      this.normalizeLigatures();
       return true;
     }
     return false;
@@ -152,6 +200,7 @@ export class ScoreModel {
     const set = new Set(ids);
     this.score.notes = this.score.notes.filter((note) => !set.has(note.id));
     for (const measure of measures) this.normalizeMeasureBeats(measure);
+    this.normalizeLigatures();
   }
 
   getNote(id) {
@@ -187,6 +236,7 @@ export class ScoreModel {
     }
     this.score.measures -= 1;
     this.normalizeAllMeasureBeats();
+    this.normalizeLigatures();
     return true;
   }
 

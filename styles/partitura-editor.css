@@ -376,3 +376,19 @@
 .partitura-rest-glyph{
   font-size: 65px;
 }
+
+.partitura-tie,
+.partitura-slur {
+  fill: none;
+  pointer-events: none;
+  stroke: #111827;
+  stroke-linecap: round;
+}
+
+.partitura-tie {
+  stroke-width: 1.9;
+}
+
+.partitura-slur {
+  stroke-width: 1.6;
+}

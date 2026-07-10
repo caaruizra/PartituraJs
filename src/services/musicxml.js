@@ -2,6 +2,199 @@ import { normalizeScore } from '../model/normalizeScore.js';
 import { clefConfig } from '../music/clef.js';
 import { durationType, isDottedDuration } from '../music/duration.js';
 
+function textOf(element, selector) {
+  const node = element?.querySelector(selector);
+  return node?.textContent?.trim() || '';
+}
+
+function numberOf(element, selector, fallback = 0) {
+  const value = Number(textOf(element, selector));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function clefFromMusicXml(sign, line) {
+  const normalizedSign = String(sign || '').trim().toUpperCase();
+  const normalizedLine = Number(line || 0);
+  if (normalizedSign === 'F' || normalizedLine === 4) return 'fa';
+  if (normalizedSign === 'C' || normalizedLine === 3) return 'do';
+  return 'sol';
+}
+
+function typeToBeats(type) {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (normalized === 'whole') return 4;
+  if (normalized === 'half') return 2;
+  if (normalized === 'quarter') return 1;
+  if (normalized === 'eighth') return 0.5;
+  if (normalized === '16th') return 0.25;
+  if (normalized === '32nd') return 0.125;
+  if (normalized === '64th') return 0.0625;
+  return 1;
+}
+
+function parseDurationBeats(noteElement, divisions) {
+  const durationDivisions = numberOf(noteElement, ':scope > duration', Number.NaN);
+  if (Number.isFinite(durationDivisions) && durationDivisions > 0) {
+    return durationDivisions / Math.max(1, divisions);
+  }
+
+  const base = typeToBeats(textOf(noteElement, ':scope > type'));
+  const dots = noteElement.querySelectorAll(':scope > dot').length;
+  let factor = 1;
+  let increment = 0.5;
+  for (let idx = 0; idx < dots; idx++) {
+    factor += increment;
+    increment /= 2;
+  }
+  return base * factor;
+}
+
+function parsePitch(noteElement) {
+  if (noteElement.querySelector(':scope > rest')) return null;
+  return {
+    step: textOf(noteElement, ':scope > pitch > step') || 'C',
+    alter: numberOf(noteElement, ':scope > pitch > alter', 0),
+    octave: numberOf(noteElement, ':scope > pitch > octave', 4)
+  };
+}
+
+function hasNotationByType(noteElement, tag, type) {
+  return [...noteElement.querySelectorAll(`:scope > notations > ${tag}`)]
+    .some((node) => String(node.getAttribute('type') || '').toLowerCase() === type);
+}
+
+function parseTies(noteElement) {
+  const tieNodes = [...noteElement.querySelectorAll(':scope > tie')];
+  const tieStart = tieNodes.some((node) => String(node.getAttribute('type') || '').toLowerCase() === 'start')
+    || hasNotationByType(noteElement, 'tied', 'start');
+  const tieStop = tieNodes.some((node) => String(node.getAttribute('type') || '').toLowerCase() === 'stop')
+    || hasNotationByType(noteElement, 'tied', 'stop');
+  return { tieStart, tieStop };
+}
+
+function parseSlurs(noteElement) {
+  return {
+    slurStart: hasNotationByType(noteElement, 'slur', 'start'),
+    slurStop: hasNotationByType(noteElement, 'slur', 'stop')
+  };
+}
+
+function ensureDomParser() {
+  const DomParserCtor = globalThis.DOMParser;
+  if (!DomParserCtor) throw new Error('DOMParser no está disponible en este entorno');
+  return DomParserCtor;
+}
+
+function createParsedScore(scoreRoot, measureCount) {
+  return {
+    title: textOf(scoreRoot, 'work > work-title') || 'Sin título',
+    composer: textOf(scoreRoot, 'identification > creator[type="composer"]') || '',
+    tempo: 90,
+    measures: Math.max(1, measureCount),
+    clef: 'sol',
+    key: { fifths: 0 },
+    timeSignature: { beats: 4, beatType: 4 },
+    notes: []
+  };
+}
+
+function applyTempo(scoreRoot, parsed) {
+  const firstSoundTempo = numberOf(scoreRoot, 'sound[tempo]', Number.NaN);
+  if (Number.isFinite(firstSoundTempo) && firstSoundTempo > 0) parsed.tempo = firstSoundTempo;
+}
+
+function applyMeasureAttributes(attrs, parsed, currentDivisions) {
+  if (!attrs) return currentDivisions;
+  let divisions = currentDivisions;
+  const parsedDivisions = numberOf(attrs, ':scope > divisions', Number.NaN);
+  if (Number.isFinite(parsedDivisions) && parsedDivisions > 0) divisions = parsedDivisions;
+
+  const beats = numberOf(attrs, ':scope > time > beats', Number.NaN);
+  const beatType = numberOf(attrs, ':scope > time > beat-type', Number.NaN);
+  if (Number.isFinite(beats) && beats > 0) parsed.timeSignature.beats = beats;
+  if (Number.isFinite(beatType) && beatType > 0) parsed.timeSignature.beatType = beatType;
+
+  const fifths = numberOf(attrs, ':scope > key > fifths', Number.NaN);
+  if (Number.isFinite(fifths)) parsed.key = { fifths };
+
+  const clefSign = textOf(attrs, ':scope > clef > sign');
+  const clefLine = numberOf(attrs, ':scope > clef > line', 0);
+  if (clefSign) parsed.clef = clefFromMusicXml(clefSign, clefLine);
+  return divisions;
+}
+
+function parseMeasureNotes(measure, measureIndex, divisions) {
+  const notes = [];
+  let cursorDivisions = 0;
+  let lastStartDivisions = 0;
+
+  const handleNote = (noteElement) => {
+    const isChord = !!noteElement.querySelector(':scope > chord');
+    const startDivisions = isChord ? lastStartDivisions : cursorDivisions;
+    const durationBeats = parseDurationBeats(noteElement, divisions);
+    const durationDiv = Math.max(1, Math.round(durationBeats * divisions));
+    const ties = parseTies(noteElement);
+    const slurs = parseSlurs(noteElement);
+
+    notes.push({
+      measure: measureIndex,
+      beat: startDivisions / Math.max(1, divisions),
+      duration: durationBeats,
+      pitch: parsePitch(noteElement),
+      lyric: textOf(noteElement, ':scope > lyric > text'),
+      tieStart: ties.tieStart,
+      tieStop: ties.tieStop,
+      slurStart: slurs.slurStart,
+      slurStop: slurs.slurStop
+    });
+
+    lastStartDivisions = startDivisions;
+    if (!isChord) cursorDivisions += durationDiv;
+  };
+
+  for (const child of measure.children) {
+    if (child.tagName === 'backup') {
+      cursorDivisions = Math.max(0, cursorDivisions - numberOf(child, ':scope > duration', 0));
+      continue;
+    }
+    if (child.tagName === 'forward') {
+      cursorDivisions += numberOf(child, ':scope > duration', 0);
+      continue;
+    }
+    if (child.tagName !== 'note') continue;
+    handleNote(child);
+  }
+
+  return notes;
+}
+
+export function importMusicXML(xmlSource) {
+  const DomParserCtor = ensureDomParser();
+  const parser = new DomParserCtor();
+  const doc = parser.parseFromString(String(xmlSource || ''), 'application/xml');
+
+  if (doc.querySelector('parsererror')) throw new Error('MusicXML inválido');
+  const scoreRoot = doc.querySelector('score-partwise');
+  if (!scoreRoot) throw new Error('Solo se soporta MusicXML partwise');
+
+  const part = scoreRoot.querySelector('part');
+  if (!part) throw new Error('No se encontró ningún part en MusicXML');
+
+  const measures = [...part.querySelectorAll(':scope > measure')];
+  const parsed = createParsedScore(scoreRoot, measures.length);
+  applyTempo(scoreRoot, parsed);
+
+  let divisions = 1;
+  for (let measureIndex = 0; measureIndex < measures.length; measureIndex++) {
+    const measure = measures[measureIndex];
+    const attrs = measure.querySelector(':scope > attributes');
+    divisions = applyMeasureAttributes(attrs, parsed, divisions);
+    parsed.notes.push(...parseMeasureNotes(measure, measureIndex, divisions));
+  }
+
+  return normalizeScore(parsed);
+}
+
 export function exportMusicXML(scoreInput) {
   const score = normalizeScore(scoreInput);
   const divisions = 4;
@@ -16,6 +209,11 @@ export function exportMusicXML(scoreInput) {
   for (const note of score.notes) {
     if (note.measure >= 0 && note.measure < score.measures) notesByMeasure[note.measure].push(note);
   }
+
+  const buildPitchXml = (pitch) => {
+    const alterXml = pitch.alter ? `<alter>${pitch.alter}</alter>` : '';
+    return `<pitch><step>${pitch.step}</step>${alterXml}<octave>${pitch.octave}</octave></pitch>`;
+  };
 
   const xmlMeasures = notesByMeasure.map((notes, measureIndex) => {
     const clef = clefConfig(score.clef);
@@ -33,15 +231,24 @@ export function exportMusicXML(scoreInput) {
       const dot = isDottedDuration(note.duration) ? '<dot/>' : '';
       const pitch = note.pitch;
       const lyric = note.lyric ? `<lyric><text>${escapeXml(note.lyric)}</text></lyric>` : '';
-      const noteBody = pitch
-        ? `<pitch><step>${pitch.step}</step>${pitch.alter ? `<alter>${pitch.alter}</alter>` : ''}<octave>${pitch.octave}</octave></pitch>`
-        : '<rest/>';
+      const tieStart = note.tieStart ? '<tie type="start"/>' : '';
+      const tieStop = note.tieStop ? '<tie type="stop"/>' : '';
+      const notations = [
+        note.tieStart ? '<tied type="start"/>' : '',
+        note.tieStop ? '<tied type="stop"/>' : '',
+        note.slurStart ? '<slur type="start" number="1"/>' : '',
+        note.slurStop ? '<slur type="stop" number="1"/>' : ''
+      ].filter(Boolean);
+      const notationsXml = notations.length ? `<notations>${notations.join('')}</notations>` : '';
+      const noteBody = pitch ? buildPitchXml(pitch) : '<rest/>';
       return `
       <note>
         ${noteBody}
+        ${tieStart}${tieStop}
         <duration>${dur}</duration>
         <type>${type}</type>${lyric}
         ${dot}
+        ${notationsXml}
       </note>`;
     }).join('');
 

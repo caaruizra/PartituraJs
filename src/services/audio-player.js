@@ -4,6 +4,71 @@ import { createSvg } from '../render/svg.js';
 
 const global = typeof window !== 'undefined' ? window : globalThis;
 
+function noteOrder(score, a, b) {
+  const beatsPerMeasure = score.timeSignature.beats;
+  const absA = (a.measure * beatsPerMeasure) + a.beat;
+  const absB = (b.measure * beatsPerMeasure) + b.beat;
+  return absA - absB;
+}
+
+function pitchKey(note) {
+  return note?.pitch ? String(pitchToMidi(note.pitch)) : '';
+}
+
+function buildPlaybackEvents(score) {
+  const notes = [...score.notes]
+    .filter((note) => !!note.pitch)
+    .sort((a, b) => noteOrder(score, a, b));
+  const events = [];
+  const openByPitch = new Map();
+  const beatsPerMeasure = score.timeSignature.beats;
+
+  const addRegularEvent = (note) => {
+    events.push({
+      note,
+      startBeat: (note.measure * beatsPerMeasure) + note.beat,
+      duration: note.duration
+    });
+  };
+
+  for (const note of notes) {
+    const key = pitchKey(note);
+    const queue = openByPitch.get(key) || [];
+    let chain = null;
+
+    if (note.tieStop && queue.length) {
+      chain = queue.shift();
+      chain.duration += note.duration;
+    }
+
+    if (note.tieStart) {
+      if (!chain) {
+        chain = {
+          note,
+          startBeat: (note.measure * beatsPerMeasure) + note.beat,
+          duration: note.duration
+        };
+      }
+      queue.push(chain);
+      openByPitch.set(key, queue);
+      continue;
+    }
+
+    if (chain) {
+      events.push(chain);
+      continue;
+    }
+
+    addRegularEvent(note);
+  }
+
+  for (const queue of openByPitch.values()) {
+    for (const chain of queue) events.push(chain);
+  }
+
+  return events.sort((a, b) => a.startBeat - b.startBeat);
+}
+
 export async function play(editor) {
   if (editor.playback) stopPlayback(editor);
   const score = editor.toJSON();
@@ -21,19 +86,21 @@ export async function play(editor) {
   }
   const secondsPerBeat = 60 / score.tempo;
   const startAt = ctx.currentTime + 0.05;
+  const playbackEvents = buildPlaybackEvents(score);
   editor.playback = {
     startAt,
     secondsPerBeat,
     totalBeats: score.measures * score.timeSignature.beats,
-    score
+    score,
+    events: playbackEvents
   };
   editor.playbackNodes = [];
-  for (const note of score.notes) {
-    if (!note.pitch) continue;
+  for (const event of playbackEvents) {
+    const note = event.note;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    const start = startAt + ((note.measure * score.timeSignature.beats) + note.beat) * secondsPerBeat;
-    const dur = Math.max(0.08, note.duration * secondsPerBeat * 0.9);
+    const start = startAt + event.startBeat * secondsPerBeat;
+    const dur = Math.max(0.08, event.duration * secondsPerBeat * 0.9);
     osc.frequency.value = 440 * Math.pow(2, (pitchToMidi(note.pitch) - 69) / 12);
     osc.type = 'sine';
     gain.gain.setValueAtTime(0.0001, start);
