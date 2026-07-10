@@ -5,7 +5,8 @@
   "main": "dist/partitura-editor.js",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "build:watch": "node scripts/build.mjs --watch"
+    "build:watch": "node scripts/build.mjs --watch",
+    "verify": "npm run build && node scripts/verify.mjs"
   },
   "files": [
     "dist",

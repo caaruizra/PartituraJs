@@ -21,9 +21,20 @@ PartituraJS es una librería JavaScript pequeña y sin dependencias para editar 
   - `src/core`: utilidades y constantes.
   - `src/music`: teoria musical (pitch, duraciones, clave, accidentales).
   - `src/model`: normalizacion y modelo de partitura.
-  - `src/services`: exportacion MusicXML.
-  - `src/editor/ScoreEditor.js`: clase `ScoreEditor` migrada como modulo puente.
+  - `src/services`: servicios de dominio (`musicxml`, `layout-engine`, `audio-player`).
+  - `src/render`: renderizado SVG (`score-renderer`, `notes`, `beams`, `svg`).
+  - `src/editor`: fachada `ScoreEditor` + controladores (`toolbar`, `keyboard`, `pointer`, `context-menu`).
   - `src/MIGRATION_PLAN.md`: plan de migracion por fases.
+
+## Arquitectura modular actual
+
+La arquitectura actual ya esta separada por responsabilidades:
+
+- `ScoreEditor` (en `src/editor/ScoreEditor.js`) actua como fachada/orquestador.
+- Controllers de entrada en `src/editor/` manejan teclado, puntero/marquee, toolbar y menu contextual.
+- Render SVG en `src/render/` dibuja partitura, notas/silencios y beaming.
+- Servicios en `src/services/` resuelven export MusicXML, layout geometrico y reproduccion de audio.
+- Modelo y teoria musical en `src/model/` y `src/music/` concentran reglas de negocio puras.
 
 ## Uso rápido
 
@@ -139,6 +150,19 @@ Para recompilar en modo watch:
 ```bash
 npm run build:watch
 ```
+
+Para verificar automaticamente compatibilidad y regresiones principales:
+
+```bash
+npm run verify
+```
+
+`verify` ejecuta build y valida:
+
+- exportaciones CommonJS esperadas
+- MusicXML con `<dot/>` y `<rest/>`
+- presencia de API global en el bundle IIFE
+- toggle nota/silencio por logica de tecla `R`
 
 La division interna de `ScoreEditor` por responsabilidades (renderer/controllers/layout/audio) sigue planificada en `src/MIGRATION_PLAN.md`.
 
