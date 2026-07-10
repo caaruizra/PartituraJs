@@ -14,6 +14,17 @@ PartituraJS es una librería JavaScript pequeña y sin dependencias para editar 
 - Exportación a JSON y MusicXML básico.
 - Sin framework: funciona con HTML, CSS y JavaScript plano.
 
+## Estructura interna
+
+- `dist/partitura-editor.js`: runtime legacy compatible (global en navegador + CommonJS en Node), regenerado desde `src/`.
+- `src/`: base modular activa.
+  - `src/core`: utilidades y constantes.
+  - `src/music`: teoria musical (pitch, duraciones, clave, accidentales).
+  - `src/model`: normalizacion y modelo de partitura.
+  - `src/services`: exportacion MusicXML.
+  - `src/editor/ScoreEditor.js`: clase `ScoreEditor` migrada como modulo puente.
+  - `src/MIGRATION_PLAN.md`: plan de migracion por fases.
+
 ## Uso rápido
 
 ```html
@@ -107,6 +118,29 @@ python3 -m http.server 8080
 ```
 
 Luego visita `http://localhost:8080/demo.html`.
+
+## Generar dist desde src
+
+Instala dependencias y genera los bundles:
+
+```bash
+npm install
+npm run build
+```
+
+Esto genera:
+
+- `dist/partitura-editor.js` (bundle legacy compatible)
+- `dist/partitura-modular.js` (IIFE para navegador)
+- `dist/partitura-modular.cjs` (CommonJS)
+
+Para recompilar en modo watch:
+
+```bash
+npm run build:watch
+```
+
+La division interna de `ScoreEditor` por responsabilidades (renderer/controllers/layout/audio) sigue planificada en `src/MIGRATION_PLAN.md`.
 
 ## Uso de IA
 

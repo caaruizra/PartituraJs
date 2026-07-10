@@ -1,0 +1,200 @@
+import { MEASURE_EPSILON } from '../core/constants.js';
+import { clamp, clone, uid } from '../core/utils.js';
+import { normalizeClef } from '../music/clef.js';
+import { noteSortValue } from '../music/pitch.js';
+import { normalizeScore } from './normalizeScore.js';
+
+export class ScoreModel {
+  constructor(score) {
+    this.score = normalizeScore(score);
+    this.normalizeAllMeasureBeats();
+  }
+
+  measureNotes(measure) {
+    return this.score.notes
+      .filter((note) => note.measure === measure)
+      .sort((a, b) => (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b)));
+  }
+
+  normalizeMeasureBeats(measure) {
+    const notes = this.measureNotes(measure);
+    const maxBeat = this.score.timeSignature.beats - 0.25;
+    let cursor = 0;
+    for (const note of notes) {
+      note.beat = clamp(cursor, 0, maxBeat);
+      cursor += note.duration;
+    }
+  }
+
+  normalizeAllMeasureBeats() {
+    for (let measure = 0; measure < this.score.measures; measure++) {
+      this.normalizeMeasureBeats(measure);
+    }
+    this.sort();
+  }
+
+  measureTotal(measure, excludeId = null) {
+    return this.score.notes
+      .filter((note) => note.measure === measure && note.id !== excludeId)
+      .reduce((sum, note) => sum + note.duration, 0);
+  }
+
+  canFitInMeasure(measure, duration, excludeId = null) {
+    const beats = this.score.timeSignature.beats;
+    const total = this.measureTotal(measure, excludeId);
+    return total + duration <= beats + MEASURE_EPSILON;
+  }
+
+  measureValidation() {
+    const beats = this.score.timeSignature.beats;
+    return Array.from({ length: this.score.measures }, (_, measure) => {
+      const total = this.measureTotal(measure);
+      const exceeds = total > beats + MEASURE_EPSILON;
+      const complete = Math.abs(total - beats) <= MEASURE_EPSILON;
+      return {
+        measure,
+        total,
+        exceeds,
+        complete,
+        invalid: !complete
+      };
+    });
+  }
+
+  shiftNotesOnInsert(measure, fromBeat, delta) {
+    if (delta <= 0) return;
+    const maxBeat = this.score.timeSignature.beats - 0.25;
+    const notesInMeasure = this.score.notes
+      .filter((note) => note.measure === measure && note.beat >= fromBeat)
+      .sort((a, b) => b.beat - a.beat);
+    for (const note of notesInMeasure) {
+      note.beat = clamp(note.beat + delta, 0, maxBeat);
+    }
+  }
+
+  addNote(note) {
+    const next = {
+      id: note.id || uid(),
+      measure: clamp(Number(note.measure || 0), 0, this.score.measures - 1),
+      beat: Math.max(0, Number(note.beat || 0)),
+      duration: Math.max(0.0625, Number(note.duration || 1)),
+      pitch: note.pitch ? {
+        step: note.pitch.step || 'C',
+        octave: Number.isFinite(note.pitch.octave) ? note.pitch.octave : 4,
+        alter: Number(note.pitch.alter || 0)
+      } : null,
+      lyric: note.lyric || '',
+      velocity: Number(note.velocity || 80)
+    };
+    next.beat = clamp(next.beat, 0, this.score.timeSignature.beats - 0.25);
+    if (!this.canFitInMeasure(next.measure, next.duration)) return null;
+    this.shiftNotesOnInsert(next.measure, next.beat, next.duration);
+    this.score.notes.push(next);
+    this.normalizeMeasureBeats(next.measure);
+    this.sort();
+    return next;
+  }
+
+  updateNote(id, patch) {
+    const note = this.getNote(id);
+    if (!note) return null;
+    const previousMeasure = note.measure;
+    const nextMeasure = clamp(
+      Number(Object.hasOwn(patch, 'measure') ? patch.measure : note.measure),
+      0,
+      this.score.measures - 1
+    );
+    const nextBeat = clamp(
+      Number(Object.hasOwn(patch, 'beat') ? patch.beat : note.beat),
+      0,
+      this.score.timeSignature.beats - 0.25
+    );
+    const nextDuration = Math.max(
+      0.0625,
+      Number(Object.hasOwn(patch, 'duration') ? patch.duration : note.duration || 1)
+    );
+    if (!this.canFitInMeasure(nextMeasure, nextDuration, id)) return null;
+
+    Object.assign(note, patch);
+    if (Object.hasOwn(patch, 'pitch')) {
+      if (!patch.pitch) note.pitch = null;
+      else if (note.pitch) note.pitch = { ...note.pitch, ...patch.pitch };
+      else note.pitch = { ...patch.pitch };
+    }
+    note.measure = nextMeasure;
+    note.beat = nextBeat;
+    note.duration = nextDuration;
+    this.normalizeMeasureBeats(nextMeasure);
+    if (previousMeasure !== nextMeasure) this.normalizeMeasureBeats(previousMeasure);
+    this.sort();
+    return note;
+  }
+
+  removeNote(id) {
+    const note = this.getNote(id);
+    if (!note) return false;
+    const measure = note.measure;
+    const before = this.score.notes.length;
+    this.score.notes = this.score.notes.filter((n) => n.id !== id);
+    if (this.score.notes.length !== before) {
+      this.normalizeMeasureBeats(measure);
+      return true;
+    }
+    return false;
+  }
+
+  removeNotes(ids) {
+    const measures = new Set(
+      this.score.notes
+        .filter((note) => ids.includes(note.id))
+        .map((note) => note.measure)
+    );
+    const set = new Set(ids);
+    this.score.notes = this.score.notes.filter((note) => !set.has(note.id));
+    for (const measure of measures) this.normalizeMeasureBeats(measure);
+  }
+
+  getNote(id) {
+    return this.score.notes.find((note) => note.id === id) || null;
+  }
+
+  setScore(score) {
+    this.score = normalizeScore(score);
+    this.normalizeAllMeasureBeats();
+  }
+
+  setClef(clef) {
+    this.score.clef = normalizeClef(clef);
+    return this.score.clef;
+  }
+
+  insertMeasure(index) {
+    const insertAt = clamp(Number(index || 0), 0, this.score.measures);
+    for (const note of this.score.notes) {
+      if (note.measure >= insertAt) note.measure += 1;
+    }
+    this.score.measures += 1;
+    this.sort();
+    return insertAt;
+  }
+
+  removeMeasure(index) {
+    if (this.score.measures <= 1) return false;
+    const removeAt = clamp(Number(index || 0), 0, this.score.measures - 1);
+    this.score.notes = this.score.notes.filter((note) => note.measure !== removeAt);
+    for (const note of this.score.notes) {
+      if (note.measure > removeAt) note.measure -= 1;
+    }
+    this.score.measures -= 1;
+    this.normalizeAllMeasureBeats();
+    return true;
+  }
+
+  toJSON() {
+    return clone(this.score);
+  }
+
+  sort() {
+    this.score.notes.sort((a, b) => (a.measure - b.measure) || (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b)));
+  }
+}

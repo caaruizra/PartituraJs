@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Editor básico de partituras en SVG para navegador, sin dependencias.",
   "main": "dist/partitura-editor.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:watch": "node scripts/build.mjs --watch"
+  },
   "files": [
     "dist",
     "styles",
@@ -16,5 +20,8 @@
     "notation",
     "partitura"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.25.8"
+  }
 }
