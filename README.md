@@ -108,6 +108,14 @@ python3 -m http.server 8080
 
 Luego visita `http://localhost:8080/demo.html`.
 
+## Uso de IA
+
+Este proyecto se ha construido apoyado en el uso de COPILOT.
+
+## Creador
+
+Carlos Alejandro Ruiz Ramirez
+
 ## Licencia
 
 MIT.

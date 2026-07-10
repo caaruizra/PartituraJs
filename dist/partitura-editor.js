@@ -375,6 +375,7 @@
       const xmlNotes = notes.map((note) => {
         const dur = Math.max(1, Math.round(note.duration * divisions));
         const type = durationType(note.duration);
+        const dot = isDottedDuration(note.duration) ? '<dot/>' : '';
         const pitch = note.pitch;
         const alter = pitch.alter ? `<alter>${pitch.alter}</alter>` : '';
         const lyric = note.lyric ? `<lyric><text>${escapeXml(note.lyric)}</text></lyric>` : '';
@@ -383,6 +384,7 @@
         <pitch><step>${pitch.step}</step>${alter}<octave>${pitch.octave}</octave></pitch>
         <duration>${dur}</duration>
         <type>${type}</type>${lyric}
+        ${dot}
       </note>`;
       }).join('');
 
@@ -1235,8 +1237,8 @@
         cx: x,
         cy: y,
         rx: 8,
-        ry: 5.6,
-        transform: `rotate(-18 ${x} ${y})`,
+        ry: 5,
+        transform: `rotate(-25 ${x} ${y})`,
         class: filled ? 'partitura-notehead is-filled' : 'partitura-notehead'
       }));
 
