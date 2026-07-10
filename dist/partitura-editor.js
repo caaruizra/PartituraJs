@@ -78,6 +78,10 @@
     return (pitch.octave + 1) * 12 + semis[pitch.step] + (pitch.alter || 0);
   }
 
+  function noteSortValue(note) {
+    return note?.pitch ? pitchToMidi(note.pitch) : Number.NEGATIVE_INFINITY;
+  }
+
   function midiToPitch(midi) {
     const names = [
       ['C', 0], ['C', 1], ['D', 0], ['D', 1], ['E', 0], ['F', 0],
@@ -127,7 +131,7 @@
     measureNotes(measure) {
       return this.score.notes
         .filter((note) => note.measure === measure)
-        .sort((a, b) => (a.beat - b.beat) || (pitchToMidi(a.pitch) - pitchToMidi(b.pitch)));
+        .sort((a, b) => (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b)));
     }
 
     normalizeMeasureBeats(measure) {
@@ -196,7 +200,7 @@
           step: note.pitch.step || 'C',
           octave: Number.isFinite(note.pitch.octave) ? note.pitch.octave : 4,
           alter: Number(note.pitch.alter || 0)
-        } : { step: 'C', octave: 4, alter: 0 },
+        } : null,
         lyric: note.lyric || '',
         velocity: Number(note.velocity || 80)
       };
@@ -230,7 +234,9 @@
       if (!this.canFitInMeasure(nextMeasure, nextDuration, id)) return null;
 
       Object.assign(note, patch);
-      if (patch.pitch) note.pitch = { ...note.pitch, ...patch.pitch };
+      if (Object.prototype.hasOwnProperty.call(patch, 'pitch')) {
+        note.pitch = patch.pitch ? { ...(note.pitch || {}), ...patch.pitch } : null;
+      }
       note.measure = nextMeasure;
       note.beat = nextBeat;
       note.duration = nextDuration;
@@ -305,7 +311,7 @@
     }
 
     sort() {
-      this.score.notes.sort((a, b) => (a.measure - b.measure) || (a.beat - b.beat) || (pitchToMidi(a.pitch) - pitchToMidi(b.pitch)));
+      this.score.notes.sort((a, b) => (a.measure - b.measure) || (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b)));
     }
   }
 
@@ -347,6 +353,16 @@
     return '';
   }
 
+  function restGlyph(duration) {
+    if (duration >= 4) return '𝄻';
+    if (duration >= 2) return '𝄼';
+    if (duration >= 1) return '𝄽';
+    if (duration >= 0.5) return '𝄾';
+    if (duration >= 0.25) return '𝄿';
+    if (duration >= 0.125) return '𝅀';
+    return '𝅁';
+  }
+
   function exportMusicXML(scoreInput) {
     const score = normalizeScore(scoreInput);
     const divisions = 4;
@@ -377,11 +393,13 @@
         const type = durationType(note.duration);
         const dot = isDottedDuration(note.duration) ? '<dot/>' : '';
         const pitch = note.pitch;
-        const alter = pitch.alter ? `<alter>${pitch.alter}</alter>` : '';
         const lyric = note.lyric ? `<lyric><text>${escapeXml(note.lyric)}</text></lyric>` : '';
+        const noteBody = pitch
+          ? `<pitch><step>${pitch.step}</step>${pitch.alter ? `<alter>${pitch.alter}</alter>` : ''}<octave>${pitch.octave}</octave></pitch>`
+          : '<rest/>';
         return `
       <note>
-        <pitch><step>${pitch.step}</step>${alter}<octave>${pitch.octave}</octave></pitch>
+        ${noteBody}
         <duration>${dur}</duration>
         <type>${type}</type>${lyric}
         ${dot}
@@ -424,6 +442,7 @@
         mode: options.mode || 'write',
         readonly: !!options.readonly,
         showToolbar: options.showToolbar !== false,
+        noteKind: options.noteKind === 'rest' ? 'rest' : 'note',
         onChange: options.onChange || null,
         onSelect: options.onSelect || null,
         onPlayNote: options.onPlayNote || null
@@ -662,6 +681,7 @@
       toolbar.className = 'partitura-toolbar';
       toolbar.innerHTML = `
         <div class="partitura-toolbar-group partitura-toolbar-durations" aria-label="Duración de nota">
+          <button type="button" data-action="toggle-note-kind" title="Cambiar a silencio" aria-label="Cambiar a silencio"><span class="partitura-music-glyph">𝄽</span><span>Nota</span></button>
           <button type="button" data-action="duration-4" title="Redonda" aria-label="Redonda"><span class="partitura-music-glyph">𝅝</span></button>
           <button type="button" data-action="duration-2" title="Blanca" aria-label="Blanca"><span class="partitura-music-glyph">𝅗𝅥</span></button>
           <button type="button" data-action="duration-1" title="Negra" aria-label="Negra"><span class="partitura-music-glyph">𝅘𝅥</span></button>
@@ -682,6 +702,7 @@
         const action = event.target.closest('button')?.dataset.action;
         if (!action) return;
         if (action.startsWith('duration-')) this.options.noteDuration = Number(action.replace('duration-', ''));
+        if (action === 'toggle-note-kind') this.toggleNoteKind();
         if (action.startsWith('clef-')) this.setClef(event.target.closest('button')?.dataset.clef);
         if (action === 'play') this.play();
         this.container.focus();
@@ -702,6 +723,16 @@
       for (const button of this.toolbar.querySelectorAll('button')) button.classList.remove('is-active');
       const mode = this.toolbar.querySelector(`[data-action="mode-${this.options.mode}"]`);
       if (mode) mode.classList.add('is-active');
+      const noteKindButton = this.toolbar.querySelector('[data-action="toggle-note-kind"]');
+      if (noteKindButton) {
+        const isRest = this.options.noteKind === 'rest';
+        noteKindButton.classList.toggle('is-active', isRest);
+        noteKindButton.title = isRest ? 'Cambiar a nota' : 'Cambiar a silencio';
+        noteKindButton.setAttribute('aria-label', noteKindButton.title);
+        noteKindButton.innerHTML = isRest
+          ? '<span class="partitura-music-glyph">𝄽</span><span>Silencio</span>'
+          : '<span class="partitura-music-glyph">𝄽</span><span>Nota</span>';
+      }
       const selectedNote = this.selectedIds.size === 1
         ? this.model.getNote([...this.selectedIds][0])
         : null;
@@ -939,14 +970,14 @@
       const groups = [];
 
       for (const note of score.notes) {
-        if (durationFlagCount(note.duration) < 1) continue;
+        if (durationFlagCount(note.duration) < 1 || !note.pitch) continue;
         if (Array.isArray(measureFilter) && !measureFilter.includes(note.measure)) continue;
         if (note.measure >= 0 && note.measure < score.measures) notesByMeasure[note.measure].push(note);
       }
 
       for (let measure = 0; measure < score.measures; measure++) {
         const notes = notesByMeasure[measure]
-          .sort((a, b) => (a.beat - b.beat) || (pitchToMidi(a.pitch) - pitchToMidi(b.pitch)));
+          .sort((a, b) => (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b)));
         if (!notes.length) continue;
 
         const chunks = [];
@@ -1127,7 +1158,7 @@
 
       for (let measure = 0; measure < score.measures; measure++) {
         const notes = notesByMeasure[measure];
-        notes.sort((a, b) => (a.beat - b.beat) || (pitchToMidi(a.pitch) - pitchToMidi(b.pitch)));
+        notes.sort((a, b) => (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b)));
         const isSystemStart = currentSystem.measureIndices.length === 0;
         const dynamicWidth = isSystemStart ? measureFirstWidths[measure] : measureBaseWidths[measure];
         if (!isSystemStart && currentSystem.measureIndices.length > 0 && cursor + dynamicWidth > availableWidth) {
@@ -1195,6 +1226,7 @@
 
     drawNote(note, bottomLine, noteBeamInfo = null, staffTop = this.options.staffTop) {
       const x = this.noteToX(note);
+      if (!note.pitch) return this.drawRest(note, x, staffTop);
       const y = this.pitchToY(note.pitch, staffTop);
       const group = createSvg('g', {
         class: `partitura-note ${this.selectedIds.has(note.id) ? 'is-selected' : ''}`,
@@ -1291,11 +1323,58 @@
       return group;
     }
 
+    drawRest(note, x, staffTop = this.options.staffTop) {
+      const y = this.restY(staffTop);
+      const group = createSvg('g', {
+        class: `partitura-note partitura-rest ${this.selectedIds.has(note.id) ? 'is-selected' : ''}`,
+        'data-note-id': note.id,
+        tabindex: 0
+      });
+
+      if (this.selectedIds.has(note.id)) {
+        group.appendChild(createSvg('rect', {
+          x: x - 16,
+          y: y - 18,
+          width: 32,
+          height: 36,
+          rx: 7,
+          ry: 7,
+          class: 'partitura-note-selection-box'
+        }));
+      }
+
+      group.appendChild(createSvg('text', {
+        x,
+        y: y + 8,
+        'text-anchor': 'middle',
+        class: 'partitura-rest-glyph'
+      }, restGlyph(note.duration)));
+
+      if (isDottedDuration(note.duration)) {
+        group.appendChild(createSvg('circle', {
+          cx: x + 16,
+          cy: y - 2,
+          r: 2.6,
+          class: 'partitura-note-dot'
+        }));
+      }
+
+      group.addEventListener('pointerdown', (event) => this.onNotePointerDown(event, note.id));
+      group.addEventListener('contextmenu', (event) => this.onNoteContextMenu(event, note.id));
+      group.addEventListener('dblclick', () => this.editNote(note.id));
+      return group;
+    }
+
     bindKeyboard() {
       this.container.onkeydown = (event) => {
         if (this.options.readonly) return;
         const handled = this.handleKeyboardNavigation(event);
         if (handled) return;
+        if (event.key.toLowerCase() === 'r' && !event.ctrlKey && !event.metaKey) {
+          event.preventDefault();
+          this.convertSelectedNoteToRest();
+          return;
+        }
         if (event.key === 'Delete' || event.key === 'Backspace') {
           event.preventDefault();
           this.removeSelected();
@@ -1336,7 +1415,7 @@
     }
 
     getOrderedNotes() {
-      return [...this.model.score.notes].sort((a, b) => (a.measure - b.measure) || (a.beat - b.beat) || (pitchToMidi(a.pitch) - pitchToMidi(b.pitch)));
+      return [...this.model.score.notes].sort((a, b) => (a.measure - b.measure) || (a.beat - b.beat) || (noteSortValue(a) - noteSortValue(b)));
     }
 
     selectAdjacentNote(currentNote, direction) {
@@ -1351,13 +1430,38 @@
     transposeSelectedNotes(semitones) {
       const selectedNotes = [...this.selectedIds].map((id) => this.model.getNote(id)).filter(Boolean);
       if (!selectedNotes.length) return;
+      const notesWithPitch = selectedNotes.filter((note) => note.pitch);
+      if (!notesWithPitch.length) return;
       this.pushHistory();
-      for (const note of selectedNotes) {
+      for (const note of notesWithPitch) {
         const nextPitch = midiToPitch(pitchToMidi(note.pitch) + semitones);
         this.model.updateNote(note.id, { pitch: nextPitch });
       }
       this.emitChange();
       this.drawScore();
+    }
+
+    convertSelectedNoteToRest() {
+      if (this.selectedIds.size !== 1) return;
+      const noteId = [...this.selectedIds][0];
+      const note = this.model.getNote(noteId);
+      if (!note) return;
+      this.pushHistory();
+      const updated = this.model.updateNote(noteId, {
+        pitch: note.pitch ? null : this.defaultNotePitch()
+      });
+      if (!updated) {
+        this.undoStack.pop();
+        return;
+      }
+      this.options.noteKind = note.pitch ? 'rest' : 'note';
+      this.emitChange();
+      this.updateToolbar();
+      this.drawScore();
+    }
+
+    defaultNotePitch() {
+      return { step: 'C', octave: 4, alter: 0 };
     }
 
     onCanvasContextMenu(event) {
@@ -1415,7 +1519,7 @@
         measure: position.measure,
         beat: position.beat,
         duration: this.options.noteDuration,
-        pitch: position.pitch
+        pitch: this.options.noteKind === 'rest' ? null : position.pitch
       });
       if (!note) {
         this.undoStack.pop();
@@ -1489,10 +1593,11 @@
       }
 
       const position = this.pointToMusicalPosition(point.x, point.y);
+      const currentNote = this.model.getNote(this.drag.id);
       const updated = this.model.updateNote(this.drag.id, {
         measure: position.measure,
         beat: position.beat,
-        pitch: position.pitch
+        pitch: currentNote?.pitch ? position.pitch : null
       });
       if (!updated) return;
       this.emitChange(false);
@@ -1530,7 +1635,7 @@
         const x = this.noteToX(note);
         const systemIndex = this.measureLayout?.measureToSystem?.[note.measure] ?? 0;
         const staffTop = this.measureLayout?.systems?.[systemIndex]?.staffTop ?? this.options.staffTop;
-        const y = this.pitchToY(note.pitch, staffTop);
+        const y = note.pitch ? this.pitchToY(note.pitch, staffTop) : this.restY(staffTop);
         if (x >= xMin && x <= xMax && y >= yMin && y <= yMax) hitIds.push(note.id);
       }
 
@@ -1613,6 +1718,10 @@
       return this.bottomLineY(staffTop) - diff * (this.options.staffSpacing / 2);
     }
 
+    restY(staffTop = this.options.staffTop) {
+      return staffTop + 2 * this.options.staffSpacing;
+    }
+
     yToPitch(y, staffTop = this.options.staffTop) {
       const reference = clefConfig(this.model.score.clef).reference;
       const diff = Math.round((this.bottomLineY(staffTop) - y) / (this.options.staffSpacing / 2));
@@ -1646,6 +1755,11 @@
 
     setMode(mode) {
       this.options.mode = mode === 'select' ? 'select' : 'write';
+      this.updateToolbar();
+    }
+
+    toggleNoteKind() {
+      this.options.noteKind = this.options.noteKind === 'rest' ? 'note' : 'rest';
       this.updateToolbar();
     }
 
@@ -1793,6 +1907,7 @@
       };
       this.playbackNodes = [];
       for (const note of score.notes) {
+        if (!note.pitch) continue;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         const start = startAt + ((note.measure * score.timeSignature.beats) + note.beat) * secondsPerBeat;
