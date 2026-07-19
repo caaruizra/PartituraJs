@@ -392,3 +392,17 @@
 .partitura-slur {
   stroke-width: 1.6;
 }
+
+.partitura-tuplet-bracket {
+  stroke: #111827;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+
+.partitura-tuplet-number {
+  fill: #111827;
+  font-family: Georgia, serif;
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}

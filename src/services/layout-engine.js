@@ -139,7 +139,8 @@ export function buildBeamLayout(editor, staffTop, measureFilter = null) {
   const groups = [];
 
   for (const note of score.notes) {
-    if (durationFlagCount(note.duration) < 1 || !note.pitch) continue;
+    const visualDuration = note.displayDuration || note.duration;
+    if (durationFlagCount(visualDuration) < 1 || !note.pitch) continue;
     if (Array.isArray(measureFilter) && !measureFilter.includes(note.measure)) continue;
     if (note.measure >= 0 && note.measure < score.measures) notesByMeasure[note.measure].push(note);
   }
@@ -199,7 +200,7 @@ export function buildBeamLayout(editor, staffTop, measureFilter = null) {
         id: note.id,
         x: noteToX(editor, note),
         y: editor.pitchToY(note.pitch, staffTop),
-        beams: durationFlagCount(note.duration)
+        beams: durationFlagCount(note.displayDuration || note.duration)
       }));
       const avgY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
       const stemUp = avgY >= staffTop + 2 * editor.options.staffSpacing;

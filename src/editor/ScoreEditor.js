@@ -62,6 +62,28 @@ import { createTranslator, normalizeLanguage } from '../i18n/index.js';
 
 const global = typeof window !== 'undefined' ? window : globalThis;
 
+function parseTupletValue(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) return Math.round(numeric);
+  const byName = {
+    dosillo: 2,
+    duplet: 2,
+    tresillo: 3,
+    triplet: 3,
+    cuatrillo: 4,
+    quadruplet: 4,
+    cinquillo: 5,
+    quintillo: 5,
+    quintuplet: 5,
+    seisillo: 6,
+    sextuplet: 6,
+    septillo: 7,
+    septuplet: 7
+  };
+  return byName[raw] ?? null;
+}
+
 export class ScoreEditor {
   constructor(container, options = {}) {
     const element = typeof container === 'string' ? document.querySelector(container) : container;
@@ -268,6 +290,42 @@ export class ScoreEditor {
 
   convertSelectedNoteToRest() {
     convertSelectedNoteToRestFromController(this);
+  }
+
+  convertSelectedNoteToTuplet(inputValue = null) {
+    if (this.selectedIds.size !== 1) return null;
+    const selectedId = [...this.selectedIds][0];
+    const source = this.model.getNote(selectedId);
+    if (!source) return null;
+
+    const rawValue = inputValue === null
+      ? global.prompt(this.t('editor.tupletPrompt'), this.t('editor.tupletPromptDefault'))
+      : inputValue;
+    if (rawValue === null) return null;
+
+    const count = parseTupletValue(rawValue);
+    if (!Number.isFinite(count) || count < 2 || count > 7) {
+      global.alert(this.t('editor.tupletInvalid'));
+      return null;
+    }
+
+    this.pushHistory();
+    const created = this.model.replaceNoteWithTuplet(selectedId, count);
+    if (!created?.length) {
+      this.undoStack.pop();
+      global.alert(this.t('editor.tupletTooShort'));
+      return null;
+    }
+
+    if (this.pendingTieStart === selectedId) this.pendingTieStart = null;
+    if (this.pendingSlurStart === selectedId) this.pendingSlurStart = null;
+    this.selectedIds = new Set(created.map((note) => note.id));
+    this.emitSelect();
+    this.emitChange();
+    this.updateToolbar();
+    this.updateMeasureToolbar();
+    this.drawScore();
+    return created;
   }
 
   onCanvasContextMenu(event) {

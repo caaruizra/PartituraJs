@@ -89,7 +89,7 @@ export function updateToolbar(editor) {
   const selectedNote = editor.selectedIds.size === 1
     ? editor.model.getNote([...editor.selectedIds][0])
     : null;
-  const activeDuration = selectedNote?.duration ?? editor.options.noteDuration;
+  const activeDuration = selectedNote?.displayDuration ?? selectedNote?.duration ?? editor.options.noteDuration;
   const dur = editor.toolbar.querySelector(`[data-action="duration-${activeDuration}"]`);
   if (dur) dur.classList.add('is-active');
   const clef = editor.toolbar.querySelector(`[data-action="clef-${editor.model.score.clef}"]`);

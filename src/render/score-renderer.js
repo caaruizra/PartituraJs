@@ -126,6 +126,85 @@ function drawLigatures(editor, system, systemIndex, systemMap, pairs, notesById,
   return group;
 }
 
+function collectTupletGroupsForSystem(editor, systemMeasures, staffTop) {
+  const measureSet = new Set(systemMeasures);
+  const groups = new Map();
+  for (const note of editor.model.score.notes) {
+    if (!measureSet.has(note.measure) || !note.tuplet?.groupId) continue;
+    const key = note.tuplet.groupId;
+    const list = groups.get(key) || [];
+    list.push(note);
+    groups.set(key, list);
+  }
+
+  const result = [];
+  for (const notes of groups.values()) {
+    notes.sort(noteOrder);
+    if (notes.length < 2) continue;
+    const fromX = editor.noteToX(notes[0]);
+    const toX = editor.noteToX(notes[notes.length - 1]);
+    if (!Number.isFinite(fromX) || !Number.isFinite(toX) || toX - fromX < 8) continue;
+    const count = Math.round(Number(notes[0].tuplet?.count || notes.length));
+    if (!Number.isFinite(count) || count < 2) continue;
+    const anchorY = Math.min(...notes.map((note) => (
+      note.pitch ? editor.pitchToY(note.pitch, staffTop) : editor.restY(staffTop)
+    )));
+    result.push({
+      fromX,
+      toX,
+      y: anchorY - 44,
+      count
+    });
+  }
+  return result;
+}
+
+function drawTuplets(editor, systemMeasures, staffTop) {
+  const group = createSvg('g', { class: 'partitura-tuplets' });
+  const tuplets = collectTupletGroupsForSystem(editor, systemMeasures, staffTop);
+  for (const tuplet of tuplets) {
+    const left = tuplet.fromX - 9;
+    const right = tuplet.toX + 9;
+    const y = tuplet.y;
+    const center = (left + right) / 2;
+    group.appendChild(createSvg('line', {
+      x1: left,
+      y1: y,
+      x2: center - 10,
+      y2: y,
+      class: 'partitura-tuplet-bracket'
+    }));
+    group.appendChild(createSvg('line', {
+      x1: center + 10,
+      y1: y,
+      x2: right,
+      y2: y,
+      class: 'partitura-tuplet-bracket'
+    }));
+    group.appendChild(createSvg('line', {
+      x1: left,
+      y1: y,
+      x2: left,
+      y2: y + 6,
+      class: 'partitura-tuplet-bracket'
+    }));
+    group.appendChild(createSvg('line', {
+      x1: right,
+      y1: y,
+      x2: right,
+      y2: y + 6,
+      class: 'partitura-tuplet-bracket'
+    }));
+    group.appendChild(createSvg('text', {
+      x: center,
+      y: y - 3,
+      'text-anchor': 'middle',
+      class: 'partitura-tuplet-number'
+    }, String(tuplet.count)));
+  }
+  return group;
+}
+
 export function drawScore(editor) {
   editor.svg.innerHTML = '';
   const s = editor.options;
@@ -278,6 +357,7 @@ export function drawScore(editor) {
       }
     }
     notesGroup.appendChild(editor.drawBeams(beamLayout.groups));
+    notesGroup.appendChild(drawTuplets(editor, systemMeasures, top));
     editor.svg.appendChild(notesGroup);
 
     const tieGroup = drawLigatures(editor, system, systemIndex, systemMap, ligatures.ties, notesById, 'tie');

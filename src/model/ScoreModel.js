@@ -10,6 +10,18 @@ export class ScoreModel {
     this.normalizeAllMeasureBeats();
   }
 
+  normalizeTuplet(tuplet, fallback = {}) {
+    if (!tuplet || typeof tuplet !== 'object') return null;
+    const count = Math.round(Number(tuplet.count));
+    if (!Number.isFinite(count) || count < 2) return null;
+    const index = clamp(Math.round(Number(tuplet.index || 1)), 1, count);
+    return {
+      groupId: String(tuplet.groupId || fallback.groupId || uid()),
+      count,
+      index
+    };
+  }
+
   measureNotes(measure) {
     return this.score.notes
       .filter((note) => note.measure === measure)
@@ -78,6 +90,8 @@ export class ScoreModel {
       measure: clamp(Number(note.measure || 0), 0, this.score.measures - 1),
       beat: Math.max(0, Number(note.beat || 0)),
       duration: Math.max(0.0625, Number(note.duration || 1)),
+      displayDuration: Math.max(0.0625, Number(note.displayDuration || note.duration || 1)),
+      tuplet: this.normalizeTuplet(note.tuplet),
       pitch: note.pitch ? {
         step: note.pitch.step || 'C',
         octave: Number.isFinite(note.pitch.octave) ? note.pitch.octave : 4,
@@ -118,6 +132,10 @@ export class ScoreModel {
       0.0625,
       Number(Object.hasOwn(patch, 'duration') ? patch.duration : note.duration || 1)
     );
+    const nextDisplayDuration = Math.max(
+      0.0625,
+      Number(Object.hasOwn(patch, 'displayDuration') ? patch.displayDuration : (note.displayDuration || note.duration || 1))
+    );
     if (!this.canFitInMeasure(nextMeasure, nextDuration, id)) return null;
 
     Object.assign(note, patch);
@@ -126,9 +144,11 @@ export class ScoreModel {
       else if (note.pitch) note.pitch = { ...note.pitch, ...patch.pitch };
       else note.pitch = { ...patch.pitch };
     }
+    if (Object.hasOwn(patch, 'tuplet')) note.tuplet = this.normalizeTuplet(patch.tuplet, note.tuplet || {});
     note.measure = nextMeasure;
     note.beat = nextBeat;
     note.duration = nextDuration;
+    note.displayDuration = nextDisplayDuration;
     if (Object.hasOwn(patch, 'tieStart')) note.tieStart = !!patch.tieStart;
     if (Object.hasOwn(patch, 'tieStop')) note.tieStop = !!patch.tieStop;
     if (Object.hasOwn(patch, 'slurStart')) note.slurStart = !!patch.slurStart;
@@ -138,6 +158,51 @@ export class ScoreModel {
     this.normalizeLigatures();
     this.sort();
     return note;
+  }
+
+  replaceNoteWithTuplet(id, count) {
+    const source = this.getNote(id);
+    const tupletCount = Math.round(Number(count));
+    if (!source || !Number.isFinite(tupletCount) || tupletCount < 2) return null;
+
+    const unitDuration = source.duration / tupletCount;
+    if (unitDuration < 0.0625 - MEASURE_EPSILON) return null;
+    const sourceDisplayDuration = Math.max(0.0625, Number(source.displayDuration || source.duration || 1));
+    const displayDuration = tupletCount <= 2
+      ? sourceDisplayDuration
+      : Math.max(0.0625, sourceDisplayDuration / (tupletCount - 1));
+
+    const groupId = uid();
+    const created = Array.from({ length: tupletCount }, (_, index) => ({
+      id: uid(),
+      measure: source.measure,
+      beat: source.beat + (index * unitDuration),
+      duration: unitDuration,
+      displayDuration,
+      tuplet: {
+        groupId,
+        count: tupletCount,
+        index: index + 1
+      },
+      pitch: source.pitch ? {
+        step: source.pitch.step,
+        octave: source.pitch.octave,
+        alter: source.pitch.alter || 0
+      } : null,
+      lyric: index === 0 ? (source.lyric || '') : '',
+      velocity: Number(source.velocity || 80),
+      tieStart: false,
+      tieStop: false,
+      slurStart: false,
+      slurStop: false
+    }));
+
+    this.score.notes = this.score.notes.filter((note) => note.id !== id);
+    this.score.notes.push(...created);
+    this.normalizeMeasureBeats(source.measure);
+    this.normalizeLigatures();
+    this.sort();
+    return created;
   }
 
   normalizeLigatures() {

@@ -8,7 +8,11 @@ export const translations = {
     editor: {
       invalidContainer: 'ScoreEditor necesita un contenedor válido.',
       lyricPrompt: 'Letra/sílaba para esta nota:',
-      titlePrompt: 'Título de la partitura:'
+      titlePrompt: 'Título de la partitura:',
+      tupletPrompt: 'Grupo de valoración especial (2-7, o nombre: dosillo, tresillo, cuatrillo, cinquillo, seisillo, septillo):',
+      tupletPromptDefault: '3',
+      tupletInvalid: 'Valor inválido. Usa 2, 3, 4, 5, 6 o 7 (o su nombre).',
+      tupletTooShort: 'No se puede crear el grupo porque la duración resultante es demasiado corta.'
     },
     toolbar: {
       measureInsert: 'Agregar notas',
@@ -45,6 +49,7 @@ export const translations = {
       noteDelete: 'Eliminar nota',
       noteToggleDotAdd: 'Agregar puntillo',
       noteToggleDotRemove: 'Quitar puntillo',
+      noteConvertTuplet: 'Convertir a grupo especial…',
       tieStart: 'Iniciar ligadura de tiempo',
       tieEndActive: 'Cerrar ligadura de tiempo aquí',
       tieEndInactive: 'Cerrar ligadura de tiempo aquí (sin inicio)',
@@ -72,7 +77,11 @@ export const translations = {
     editor: {
       invalidContainer: 'ScoreEditor needs a valid container.',
       lyricPrompt: 'Lyric/syllable for this note:',
-      titlePrompt: 'Score title:'
+      titlePrompt: 'Score title:',
+      tupletPrompt: 'Tuplet value (2-7, or name: duplet, triplet, quadruplet, quintuplet, sextuplet, septuplet):',
+      tupletPromptDefault: '3',
+      tupletInvalid: 'Invalid value. Use 2, 3, 4, 5, 6, or 7 (or its name).',
+      tupletTooShort: 'Cannot create the tuplet because resulting note duration is too short.'
     },
     toolbar: {
       measureInsert: 'Insert notes',
@@ -109,6 +118,7 @@ export const translations = {
       noteDelete: 'Delete note',
       noteToggleDotAdd: 'Add dot',
       noteToggleDotRemove: 'Remove dot',
+      noteConvertTuplet: 'Convert to tuplet…',
       tieStart: 'Start tie',
       tieEndActive: 'End tie here',
       tieEndInactive: 'End tie here (no start)',

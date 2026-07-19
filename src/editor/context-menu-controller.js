@@ -67,13 +67,19 @@ function handleToggleDotAction(editor) {
 function handleMenuAction(editor, action) {
   if (!action) return;
   const isMeasureAction = handleMeasureAction(editor, action);
-  if (!isMeasureAction && action === 'note-delete') handleNoteDeleteAction(editor);
-  if (!isMeasureAction && action === 'note-toggle-dot') handleToggleDotAction(editor);
-  if (!isMeasureAction && action === 'note-tie-start') editor.startTie(editor.contextMenuNote);
-  if (!isMeasureAction && action === 'note-tie-end') editor.endTie(editor.contextMenuNote);
-  if (!isMeasureAction && action === 'note-slur-start') editor.startSlur(editor.contextMenuNote);
-  if (!isMeasureAction && action === 'note-slur-end') editor.endSlur(editor.contextMenuNote);
-  if (!isMeasureAction && action === 'note-clear-ligatures') editor.clearLigatures(editor.contextMenuNote);
+  if (!isMeasureAction) {
+    const noteActions = {
+      'note-delete': () => handleNoteDeleteAction(editor),
+      'note-toggle-dot': () => handleToggleDotAction(editor),
+      'note-convert-tuplet': () => editor.convertSelectedNoteToTuplet(),
+      'note-tie-start': () => editor.startTie(editor.contextMenuNote),
+      'note-tie-end': () => editor.endTie(editor.contextMenuNote),
+      'note-slur-start': () => editor.startSlur(editor.contextMenuNote),
+      'note-slur-end': () => editor.endSlur(editor.contextMenuNote),
+      'note-clear-ligatures': () => editor.clearLigatures(editor.contextMenuNote)
+    };
+    noteActions[action]?.();
+  }
   hideContextMenu(editor);
 }
 
@@ -120,6 +126,7 @@ export function renderContextMenu(editor) {
       <div class="partitura-context-menu-group" data-context-group="note">
         <button type="button" data-action="note-delete">${editor.t('contextMenu.noteDelete')}</button>
         <button type="button" data-action="note-toggle-dot">${editor.t('contextMenu.noteToggleDotAdd')}</button>
+        <button type="button" data-action="note-convert-tuplet">${editor.t('contextMenu.noteConvertTuplet')}</button>
         <button type="button" data-action="note-tie-start">${editor.t('contextMenu.tieStart')}</button>
         <button type="button" data-action="note-tie-end">${editor.t('contextMenu.tieEndInactive')}</button>
         <button type="button" data-action="note-slur-start">${editor.t('contextMenu.slurStart')}</button>

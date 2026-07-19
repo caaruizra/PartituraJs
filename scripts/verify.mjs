@@ -107,6 +107,43 @@ function main() {
     assert(xml.includes('<rest/>'), 'Expected <rest/> in MusicXML');
   });
 
+  run('MusicXML export includes tuplet time-modification and notation', () => {
+    const xml = requireApi.exportMusicXML({
+      measures: 1,
+      timeSignature: { beats: 4, beatType: 4 },
+      notes: [
+        {
+          measure: 0,
+          beat: 0,
+          duration: 1 / 3,
+          displayDuration: 0.5,
+          tuplet: { groupId: 't1', count: 3, index: 1 },
+          pitch: { step: 'C', octave: 4, alter: 0 }
+        },
+        {
+          measure: 0,
+          beat: 1 / 3,
+          duration: 1 / 3,
+          displayDuration: 0.5,
+          tuplet: { groupId: 't1', count: 3, index: 2 },
+          pitch: { step: 'D', octave: 4, alter: 0 }
+        },
+        {
+          measure: 0,
+          beat: 2 / 3,
+          duration: 1 / 3,
+          displayDuration: 0.5,
+          tuplet: { groupId: 't1', count: 3, index: 3 },
+          pitch: { step: 'E', octave: 4, alter: 0 }
+        }
+      ]
+    });
+
+    assert(xml.includes('<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>'), 'Expected tuplet <time-modification> in MusicXML');
+    assert(xml.includes('<tuplet type="start" number="1"/>'), 'Expected tuplet start notation in MusicXML');
+    assert(xml.includes('<tuplet type="stop" number="1"/>'), 'Expected tuplet stop notation in MusicXML');
+  });
+
   run('Browser IIFE bundle exposes PartituraJS symbol', () => {
     const source = readBrowserBundle();
     assert(source.includes('var PartituraJS'), 'IIFE PartituraJS symbol not found');

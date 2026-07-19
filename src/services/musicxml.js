@@ -49,6 +49,47 @@ function parseDurationBeats(noteElement, divisions) {
   return base * factor;
 }
 
+function parseDisplayDurationBeats(noteElement, durationBeats) {
+  const typeText = textOf(noteElement, ':scope > type');
+  const base = typeToBeats(typeText);
+  const hasType = !!typeText;
+  const dots = noteElement.querySelectorAll(':scope > dot').length;
+  let factor = 1;
+  let increment = 0.5;
+  for (let idx = 0; idx < dots; idx++) {
+    factor += increment;
+    increment /= 2;
+  }
+
+  if (hasType) return base * factor;
+
+  const actualNotes = Math.round(numberOf(noteElement, ':scope > time-modification > actual-notes', Number.NaN));
+  const normalNotes = Math.round(numberOf(noteElement, ':scope > time-modification > normal-notes', Number.NaN));
+  if (Number.isFinite(actualNotes) && actualNotes > 0 && Number.isFinite(normalNotes) && normalNotes > 0) {
+    return durationBeats * (actualNotes / normalNotes);
+  }
+  return durationBeats;
+}
+
+function parseTupletState(noteElement) {
+  const actualNotes = Math.round(numberOf(noteElement, ':scope > time-modification > actual-notes', Number.NaN));
+  const normalNotes = Math.round(numberOf(noteElement, ':scope > time-modification > normal-notes', Number.NaN));
+  if (!Number.isFinite(actualNotes) || actualNotes < 2) return null;
+  if (!Number.isFinite(normalNotes) || normalNotes < 1) return null;
+
+  const tuplets = [...noteElement.querySelectorAll(':scope > notations > tuplet')];
+  const startNode = tuplets.find((node) => String(node.getAttribute('type') || '').toLowerCase() === 'start') || null;
+  const stopNode = tuplets.find((node) => String(node.getAttribute('type') || '').toLowerCase() === 'stop') || null;
+  const number = Number(startNode?.getAttribute('number') || stopNode?.getAttribute('number') || 1) || 1;
+  return {
+    actualNotes,
+    normalNotes,
+    number,
+    start: !!startNode,
+    stop: !!stopNode
+  };
+}
+
 function parsePitch(noteElement) {
   if (noteElement.querySelector(':scope > rest')) return null;
   return {
@@ -123,7 +164,7 @@ function applyMeasureAttributes(attrs, parsed, currentDivisions) {
   return divisions;
 }
 
-function parseMeasureNotes(measure, measureIndex, divisions) {
+function parseMeasureNotes(measure, measureIndex, divisions, tupletState) {
   const notes = [];
   let cursorDivisions = 0;
   let lastStartDivisions = 0;
@@ -132,14 +173,44 @@ function parseMeasureNotes(measure, measureIndex, divisions) {
     const isChord = !!noteElement.querySelector(':scope > chord');
     const startDivisions = isChord ? lastStartDivisions : cursorDivisions;
     const durationBeats = parseDurationBeats(noteElement, divisions);
+    const displayDuration = parseDisplayDurationBeats(noteElement, durationBeats);
     const durationDiv = Math.max(1, Math.round(durationBeats * divisions));
     const ties = parseTies(noteElement);
     const slurs = parseSlurs(noteElement);
+    const tupletInfo = parseTupletState(noteElement);
+
+    let tuplet = null;
+    if (tupletInfo) {
+      const slot = Number(tupletInfo.number) || 1;
+      let active = tupletState.activeByNumber.get(slot);
+
+      if (!active || tupletInfo.start) {
+        active = {
+          groupId: `tuplet-${tupletState.nextGroupId++}`,
+          count: tupletInfo.actualNotes,
+          index: 1
+        };
+        tupletState.activeByNumber.set(slot, active);
+      }
+
+      tuplet = {
+        groupId: active.groupId,
+        count: active.count,
+        index: active.index
+      };
+      active.index += 1;
+
+      if (tupletInfo.stop || active.index > active.count) {
+        tupletState.activeByNumber.delete(slot);
+      }
+    }
 
     notes.push({
       measure: measureIndex,
       beat: startDivisions / Math.max(1, divisions),
       duration: durationBeats,
+      displayDuration,
+      tuplet,
       pitch: parsePitch(noteElement),
       lyric: textOf(noteElement, ':scope > lyric > text'),
       tieStart: ties.tieStart,
@@ -186,11 +257,15 @@ export function importMusicXML(xmlSource, options = {}) {
   applyTempo(scoreRoot, parsed);
 
   let divisions = 1;
+  const tupletState = {
+    activeByNumber: new Map(),
+    nextGroupId: 1
+  };
   for (let measureIndex = 0; measureIndex < measures.length; measureIndex++) {
     const measure = measures[measureIndex];
     const attrs = measure.querySelector(':scope > attributes');
     divisions = applyMeasureAttributes(attrs, parsed, divisions);
-    parsed.notes.push(...parseMeasureNotes(measure, measureIndex, divisions));
+    parsed.notes.push(...parseMeasureNotes(measure, measureIndex, divisions, tupletState));
   }
 
   return normalizeScore(parsed);
@@ -216,6 +291,15 @@ export function exportMusicXML(scoreInput) {
     return `<pitch><step>${pitch.step}</step>${alterXml}<octave>${pitch.octave}</octave></pitch>`;
   };
 
+  const tupletTimeModification = (note) => {
+    const count = Math.round(Number(note.tuplet?.count));
+    if (!Number.isFinite(count) || count < 2) return null;
+    return {
+      actualNotes: count,
+      normalNotes: Math.max(1, count - 1)
+    };
+  };
+
   const xmlMeasures = notesByMeasure.map((notes, measureIndex) => {
     const clef = clefConfig(score.clef);
     const attributes = measureIndex === 0 ? `
@@ -228,17 +312,24 @@ export function exportMusicXML(scoreInput) {
 
     const xmlNotes = notes.map((note) => {
       const dur = Math.max(1, Math.round(note.duration * divisions));
-      const type = durationType(note.duration);
-      const dot = isDottedDuration(note.duration) ? '<dot/>' : '';
+      const visualDuration = note.displayDuration || note.duration;
+      const type = durationType(visualDuration);
+      const dot = isDottedDuration(visualDuration) ? '<dot/>' : '';
       const pitch = note.pitch;
       const lyric = note.lyric ? `<lyric><text>${escapeXml(note.lyric)}</text></lyric>` : '';
       const tieStart = note.tieStart ? '<tie type="start"/>' : '';
       const tieStop = note.tieStop ? '<tie type="stop"/>' : '';
+      const timeModification = tupletTimeModification(note);
+      const timeModificationXml = timeModification
+        ? `<time-modification><actual-notes>${timeModification.actualNotes}</actual-notes><normal-notes>${timeModification.normalNotes}</normal-notes></time-modification>`
+        : '';
       const notations = [
         note.tieStart ? '<tied type="start"/>' : '',
         note.tieStop ? '<tied type="stop"/>' : '',
         note.slurStart ? '<slur type="start" number="1"/>' : '',
-        note.slurStop ? '<slur type="stop" number="1"/>' : ''
+        note.slurStop ? '<slur type="stop" number="1"/>' : '',
+        note.tuplet?.index === 1 ? '<tuplet type="start" number="1"/>' : '',
+        note.tuplet?.index === note.tuplet?.count ? '<tuplet type="stop" number="1"/>' : ''
       ].filter(Boolean);
       const notationsXml = notations.length ? `<notations>${notations.join('')}</notations>` : '';
       const noteBody = pitch ? buildPitchXml(pitch) : '<rest/>';
@@ -247,6 +338,7 @@ export function exportMusicXML(scoreInput) {
         ${noteBody}
         ${tieStart}${tieStop}
         <duration>${dur}</duration>
+        ${timeModificationXml}
         <type>${type}</type>${lyric}
         ${dot}
         ${notationsXml}

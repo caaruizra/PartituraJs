@@ -8,6 +8,7 @@ import {
 import { createSvg } from './svg.js';
 
 export function drawRest(editor, note, x, staffTop = editor.options.staffTop) {
+  const visualDuration = note.displayDuration || note.duration;
   const y = editor.restY(staffTop);
   const group = createSvg('g', {
     class: `partitura-note partitura-rest ${editor.selectedIds.has(note.id) ? 'is-selected' : ''}`,
@@ -32,9 +33,9 @@ export function drawRest(editor, note, x, staffTop = editor.options.staffTop) {
     y: y + 8,
     'text-anchor': 'middle',
     class: 'partitura-rest-glyph'
-  }, restGlyph(note.duration)));
+  }, restGlyph(visualDuration)));
 
-  if (isDottedDuration(note.duration)) {
+  if (isDottedDuration(visualDuration)) {
     group.appendChild(createSvg('circle', {
       cx: x + 16,
       cy: y - 2,
@@ -52,6 +53,7 @@ export function drawRest(editor, note, x, staffTop = editor.options.staffTop) {
 export function drawNote(editor, note, bottomLine, noteBeamInfo = null, staffTop = editor.options.staffTop) {
   const x = editor.noteToX(note);
   if (!note.pitch) return drawRest(editor, note, x, staffTop);
+  const visualDuration = note.displayDuration || note.duration;
   const y = editor.pitchToY(note.pitch, staffTop);
   const group = createSvg('g', {
     class: `partitura-note ${editor.selectedIds.has(note.id) ? 'is-selected' : ''}`,
@@ -69,7 +71,7 @@ export function drawNote(editor, note, bottomLine, noteBeamInfo = null, staffTop
     }));
   }
 
-  const type = durationType(note.duration);
+  const type = durationType(visualDuration);
   const filled = type !== 'whole' && type !== 'half';
   if (editor.selectedIds.has(note.id)) {
     group.appendChild(createSvg('rect', {
@@ -82,7 +84,7 @@ export function drawNote(editor, note, bottomLine, noteBeamInfo = null, staffTop
       class: 'partitura-note-selection-box'
     }));
   }
-  if (isDottedDuration(note.duration)) {
+  if (isDottedDuration(visualDuration)) {
     group.appendChild(createSvg('circle', {
       cx: x + 14,
       cy: y - 1,
@@ -112,7 +114,7 @@ export function drawNote(editor, note, bottomLine, noteBeamInfo = null, staffTop
       class: 'partitura-stem'
     }));
     if (!beamed) {
-      const flags = durationFlagCount(note.duration);
+      const flags = durationFlagCount(visualDuration);
       for (let idx = 0; idx < flags; idx++) {
         const offset = idx * 8;
         const startY = stemUp ? stemEnd + offset : stemEnd - offset;
