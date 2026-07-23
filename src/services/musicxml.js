@@ -131,6 +131,7 @@ function createParsedScore(scoreRoot, measureCount, defaultTitle = 'Untitled') {
     title: textOf(scoreRoot, 'work > work-title') || defaultTitle,
     composer: textOf(scoreRoot, 'identification > creator[type="composer"]') || '',
     tempo: 90,
+    tempoChanges: [{ measure: 0, tempo: 90 }],
     measures: Math.max(1, measureCount),
     clef: 'sol',
     key: { fifths: 0 },
@@ -147,9 +148,27 @@ function upsertKeyChange(keyChanges, measure, fifths) {
   else keyChanges.push(next);
 }
 
+function upsertTempoChange(tempoChanges, measure, tempo) {
+  const idx = tempoChanges.findIndex((event) => event.measure === measure);
+  const next = { measure, tempo };
+  if (idx >= 0) tempoChanges[idx] = next;
+  else tempoChanges.push(next);
+}
+
 function applyTempo(scoreRoot, parsed) {
   const firstSoundTempo = numberOf(scoreRoot, 'sound[tempo]', Number.NaN);
-  if (Number.isFinite(firstSoundTempo) && firstSoundTempo > 0) parsed.tempo = firstSoundTempo;
+  if (Number.isFinite(firstSoundTempo) && firstSoundTempo > 0) {
+    parsed.tempo = firstSoundTempo;
+    upsertTempoChange(parsed.tempoChanges, 0, firstSoundTempo);
+  }
+}
+
+function parseMeasureTempo(measure) {
+  const direct = numberOf(measure, ':scope > sound[tempo]', Number.NaN);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const fromDirection = numberOf(measure, ':scope > direction > sound[tempo]', Number.NaN);
+  if (Number.isFinite(fromDirection) && fromDirection > 0) return fromDirection;
+  return Number.NaN;
 }
 
 function applyMeasureAttributes(attrs, parsed, currentDivisions, measureIndex) {
@@ -276,6 +295,11 @@ export function importMusicXML(xmlSource, options = {}) {
     const measure = measures[measureIndex];
     const attrs = measure.querySelector(':scope > attributes');
     divisions = applyMeasureAttributes(attrs, parsed, divisions, measureIndex);
+    const measureTempo = parseMeasureTempo(measure);
+    if (Number.isFinite(measureTempo) && measureTempo > 0) {
+      parsed.tempo = measureTempo;
+      upsertTempoChange(parsed.tempoChanges, measureIndex, measureTempo);
+    }
     parsed.notes.push(...parseMeasureNotes(measure, measureIndex, divisions, tupletState));
   }
 
@@ -294,6 +318,8 @@ export function exportMusicXML(scoreInput) {
 
   const keyChanges = Array.isArray(score.keyChanges) ? score.keyChanges : [{ measure: 0, fifths: score.key?.fifths || 0 }];
   const keyByMeasure = new Map(keyChanges.map((event) => [Number(event.measure || 0), Number(event.fifths || 0)]));
+  const tempoChanges = Array.isArray(score.tempoChanges) ? score.tempoChanges : [{ measure: 0, tempo: score.tempo || 90 }];
+  const tempoByMeasure = new Map(tempoChanges.map((event) => [Number(event.measure || 0), Number(event.tempo || 90)]));
 
   const notesByMeasure = Array.from({ length: score.measures }, () => []);
   for (const note of score.notes) {
@@ -331,6 +357,10 @@ export function exportMusicXML(scoreInput) {
       parts.push(`<key><fifths>${keyFifths}</fifths></key>`);
     }
     const attributes = parts.length ? `\n      <attributes>${parts.join('')}</attributes>` : '';
+    const hasTempoChange = tempoByMeasure.has(measureIndex);
+    const tempoDirection = hasTempoChange
+      ? `\n      <direction><sound tempo="${Math.round(Number(tempoByMeasure.get(measureIndex) || score.tempo || 90))}"/></direction>`
+      : '';
 
     const xmlNotes = notes.map((note) => {
       const dur = Math.max(1, Math.round(note.duration * divisions));
@@ -368,7 +398,7 @@ export function exportMusicXML(scoreInput) {
     }).join('');
 
     return `
-    <measure number="${measureIndex + 1}">${attributes}${xmlNotes}
+    <measure number="${measureIndex + 1}">${attributes}${tempoDirection}${xmlNotes}
     </measure>`;
   }).join('');
 

@@ -305,6 +305,13 @@
   font-weight: 800;
 }
 
+.partitura-tempo {
+  fill: var(--pe-muted);
+  font-family: Georgia, serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .partitura-note {
   cursor: grab;
 }

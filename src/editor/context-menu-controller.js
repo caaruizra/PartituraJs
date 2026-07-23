@@ -13,6 +13,38 @@ function parseKeySignatureInput(value) {
   return null;
 }
 
+function parseTempoInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return clamp(Math.round(numeric), 20, 300);
+}
+
+function handleMeasureKeySignatureAction(editor) {
+  const current = editor.model.getKeyAtMeasure(editor.contextMenuMeasure);
+  const input = window.prompt(editor.t('editor.keySignaturePrompt'), String(current));
+  if (input === null) return;
+  const fifths = parseKeySignatureInput(input);
+  if (fifths === null) {
+    window.alert(editor.t('editor.keySignatureInvalid'));
+    return;
+  }
+  editor.setKeySignatureAt(editor.contextMenuMeasure, fifths);
+}
+
+function handleMeasureTempoAction(editor) {
+  const current = editor.model.getTempoAtMeasure(editor.contextMenuMeasure);
+  const input = window.prompt(editor.t('editor.tempoPrompt'), String(current));
+  if (input === null) return;
+  const tempo = parseTempoInput(input);
+  if (tempo === null) {
+    window.alert(editor.t('editor.tempoInvalid'));
+    return;
+  }
+  editor.setTempoAtMeasure(editor.contextMenuMeasure, tempo);
+}
+
 function positionMenu(editor, event) {
   if (!editor.contextMenu) return;
   const containerRect = editor.container.getBoundingClientRect();
@@ -36,18 +68,14 @@ function positionMenu(editor, event) {
 function handleMeasureAction(editor, action) {
   if (!action.startsWith('measure-')) return false;
   if (editor.contextMenuMeasure === null) return true;
-  if (action === 'measure-insert-before') editor.insertMeasureAt(editor.contextMenuMeasure);
-  if (action === 'measure-insert-after') editor.insertMeasureAt(editor.contextMenuMeasure + 1);
-  if (action === 'measure-delete') editor.removeMeasureAt(editor.contextMenuMeasure);
-  if (action === 'measure-key-signature') {
-    const current = editor.model.getKeyAtMeasure(editor.contextMenuMeasure);
-    const input = window.prompt(editor.t('editor.keySignaturePrompt'), String(current));
-    if (input !== null) {
-      const fifths = parseKeySignatureInput(input);
-      if (fifths === null) window.alert(editor.t('editor.keySignatureInvalid'));
-      else editor.setKeySignatureAt(editor.contextMenuMeasure, fifths);
-    }
-  }
+  const actions = {
+    'measure-insert-before': () => editor.insertMeasureAt(editor.contextMenuMeasure),
+    'measure-insert-after': () => editor.insertMeasureAt(editor.contextMenuMeasure + 1),
+    'measure-delete': () => editor.removeMeasureAt(editor.contextMenuMeasure),
+    'measure-key-signature': () => handleMeasureKeySignatureAction(editor),
+    'measure-tempo': () => handleMeasureTempoAction(editor)
+  };
+  actions[action]?.();
   return true;
 }
 
@@ -142,6 +170,7 @@ export function renderContextMenu(editor) {
         <button type="button" data-action="measure-insert-before">${editor.t('contextMenu.measureInsertBefore')}</button>
         <button type="button" data-action="measure-insert-after">${editor.t('contextMenu.measureInsertAfter')}</button>
         <button type="button" data-action="measure-key-signature">${editor.t('contextMenu.measureKeySignature')}</button>
+        <button type="button" data-action="measure-tempo">${editor.t('contextMenu.measureTempo')}</button>
         <button type="button" data-action="measure-delete">${editor.t('contextMenu.measureDelete')}</button>
       </div>
       <div class="partitura-context-menu-divider"></div>

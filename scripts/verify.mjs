@@ -161,6 +161,23 @@ function main() {
     assert(xml.includes('<key><fifths>-3</fifths></key>'), 'Expected key change attributes in export');
   });
 
+  run('MusicXML exports tempo changes', () => {
+    const xml = requireApi.exportMusicXML({
+      measures: 2,
+      timeSignature: { beats: 4, beatType: 4 },
+      tempoChanges: [
+        { measure: 0, tempo: 96 },
+        { measure: 1, tempo: 120 }
+      ],
+      notes: [
+        { measure: 0, beat: 0, duration: 1, pitch: { step: 'C', octave: 4, alter: 0 } }
+      ]
+    });
+
+    assert(xml.includes('<sound tempo="96"/>'), 'Expected initial tempo in export');
+    assert(xml.includes('<sound tempo="120"/>'), 'Expected later tempo change in export');
+  });
+
   run('Browser IIFE bundle exposes PartituraJS symbol', () => {
     const source = readBrowserBundle();
     assert(source.includes('var PartituraJS'), 'IIFE PartituraJS symbol not found');

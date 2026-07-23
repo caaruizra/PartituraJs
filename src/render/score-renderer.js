@@ -331,6 +331,8 @@ export function drawScore(editor) {
     editor.svg.appendChild(systemKey.group);
 
     const timeX = editor.measureLayout.starts[systemStart] + 105 + systemKey.width;
+    const systemTempo = editor.model.getTempoAtMeasure(systemStart);
+    const showSystemTempo = systemIndex === 0 || editor.model.hasTempoChangeAtMeasure(systemStart);
 
     editor.svg.appendChild(createSvg('text', {
       x: timeX,
@@ -343,11 +345,29 @@ export function drawScore(editor) {
       class: 'partitura-time'
     }, String(score.timeSignature.beatType)));
 
+    if (showSystemTempo) {
+      editor.svg.appendChild(createSvg('text', {
+        x: timeX + 30,
+        y: top - 14,
+        class: 'partitura-tempo'
+      }, `♩=${systemTempo}`));
+    }
+
     for (const measure of systemMeasures) {
       if (measure === systemStart || !editor.model.hasKeyChangeAtMeasure(measure)) continue;
       const fifths = editor.model.getKeyAtMeasure(measure);
       const midKey = drawKeySignature(editor, fifths, editor.measureLayout.starts[measure] + 8, top);
       editor.svg.appendChild(midKey.group);
+    }
+
+    for (const measure of systemMeasures) {
+      if (measure === systemStart || !editor.model.hasTempoChangeAtMeasure(measure)) continue;
+      const tempo = editor.model.getTempoAtMeasure(measure);
+      editor.svg.appendChild(createSvg('text', {
+        x: editor.measureLayout.starts[measure] + 8,
+        y: top - 14,
+        class: 'partitura-tempo'
+      }, `♩=${tempo}`));
     }
 
     const beatGuideGroup = createSvg('g', { class: 'partitura-beat-guides' });

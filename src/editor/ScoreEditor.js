@@ -646,6 +646,16 @@ export class ScoreEditor {
     this.drawScore();
   }
 
+  setTempoAtMeasure(measure, tempo) {
+    this.pushHistory();
+    this.model.setTempoAtMeasure(measure, tempo);
+    this.hideContextMenu();
+    this.emitChange();
+    this.updateToolbar();
+    this.updateMeasureToolbar();
+    this.drawScore();
+  }
+
   toJSON() {
     return this.model.toJSON();
   }

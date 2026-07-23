@@ -43,6 +43,66 @@ export class ScoreModel {
     this.score.key = { fifths: deduped[0].fifths };
   }
 
+  normalizeTempoChanges() {
+    const maxMeasure = Math.max(0, this.score.measures - 1);
+    const events = Array.isArray(this.score.tempoChanges)
+      ? this.score.tempoChanges
+        .filter((event) => event && typeof event === 'object')
+        .map((event) => ({
+          measure: clamp(Math.round(Number(event.measure || 0)), 0, maxMeasure),
+          tempo: clamp(Math.round(Number(event.tempo || 90)), 20, 300)
+        }))
+      : [];
+
+    events.sort((a, b) => a.measure - b.measure);
+    const deduped = [];
+    for (const event of events) {
+      if (deduped.length && deduped.at(-1).measure === event.measure) {
+        deduped[deduped.length - 1] = event;
+      } else {
+        deduped.push(event);
+      }
+    }
+
+    const firstEvent = deduped.find((event) => event.measure === 0) || null;
+    const initial = clamp(
+      Math.round(Number(firstEvent?.tempo ?? this.score.tempo ?? 90)),
+      20,
+      300
+    );
+    if (!deduped.length || deduped[0].measure !== 0) deduped.unshift({ measure: 0, tempo: initial });
+    deduped[0].tempo = initial;
+    this.score.tempoChanges = deduped;
+    this.score.tempo = deduped[0].tempo;
+  }
+
+  hasTempoChangeAtMeasure(measure) {
+    const target = clamp(Math.round(Number(measure || 0)), 0, this.score.measures - 1);
+    return (this.score.tempoChanges || []).some((event) => event.measure === target);
+  }
+
+  getTempoAtMeasure(measure) {
+    const target = clamp(Math.round(Number(measure || 0)), 0, this.score.measures - 1);
+    let active = clamp(Math.round(Number(this.score.tempo || 90)), 20, 300);
+    for (const event of this.score.tempoChanges || []) {
+      if (event.measure > target) break;
+      active = clamp(Math.round(Number(event.tempo || 90)), 20, 300);
+    }
+    return active;
+  }
+
+  setTempoAtMeasure(measure, tempo) {
+    const target = clamp(Math.round(Number(measure || 0)), 0, this.score.measures - 1);
+    const normalizedTempo = clamp(Math.round(Number(tempo || 90)), 20, 300);
+    const tempoChanges = Array.isArray(this.score.tempoChanges) ? [...this.score.tempoChanges] : [];
+    const idx = tempoChanges.findIndex((event) => event.measure === target);
+    if (idx >= 0) tempoChanges[idx] = { measure: target, tempo: normalizedTempo };
+    else tempoChanges.push({ measure: target, tempo: normalizedTempo });
+    this.score.tempoChanges = tempoChanges;
+    this.normalizeTempoChanges();
+    return normalizedTempo;
+  }
+
   hasKeyChangeAtMeasure(measure) {
     const target = clamp(Math.round(Number(measure || 0)), 0, this.score.measures - 1);
     return (this.score.keyChanges || []).some((event) => event.measure === target);
@@ -336,6 +396,7 @@ export class ScoreModel {
     this.score = normalizeScore(score, options);
     this.normalizeAllMeasureBeats();
     this.normalizeKeyChanges();
+    this.normalizeTempoChanges();
   }
 
   setClef(clef) {
@@ -346,6 +407,7 @@ export class ScoreModel {
   insertMeasure(index) {
     const insertAt = clamp(Number(index || 0), 0, this.score.measures);
     const inheritedFifths = this.getKeyAtMeasure(Math.min(insertAt, this.score.measures - 1));
+    const inheritedTempo = this.getTempoAtMeasure(Math.min(insertAt, this.score.measures - 1));
     for (const note of this.score.notes) {
       if (note.measure >= insertAt) note.measure += 1;
     }
@@ -354,9 +416,16 @@ export class ScoreModel {
         ? { ...event, measure: event.measure + 1 }
         : event
     ));
+    this.score.tempoChanges = (this.score.tempoChanges || []).map((event) => (
+      event.measure >= insertAt
+        ? { ...event, measure: event.measure + 1 }
+        : event
+    ));
     this.score.measures += 1;
     this.setKeyAtMeasure(insertAt, inheritedFifths);
+    this.setTempoAtMeasure(insertAt, inheritedTempo);
     this.normalizeKeyChanges();
+    this.normalizeTempoChanges();
     this.sort();
     return insertAt;
   }
@@ -375,9 +444,17 @@ export class ScoreModel {
           ? { ...event, measure: event.measure - 1 }
           : event
       ));
+    this.score.tempoChanges = (this.score.tempoChanges || [])
+      .filter((event) => event.measure !== removeAt)
+      .map((event) => (
+        event.measure > removeAt
+          ? { ...event, measure: event.measure - 1 }
+          : event
+      ));
     this.score.measures -= 1;
     this.normalizeAllMeasureBeats();
     this.normalizeKeyChanges();
+    this.normalizeTempoChanges();
     this.normalizeLigatures();
     return true;
   }

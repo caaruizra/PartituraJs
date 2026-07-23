@@ -7,6 +7,12 @@ function normalizeFifths(value) {
   return Math.max(-7, Math.min(7, numeric));
 }
 
+function normalizeTempoValue(value, fallback = 90) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+  return Math.max(20, Math.min(300, Math.round(numeric)));
+}
+
 function normalizeKeyChanges(score = {}, measures = 1) {
   const maxMeasure = Math.max(0, Number(measures || 1) - 1);
   const sourceEvents = Array.isArray(score.keyChanges)
@@ -40,6 +46,39 @@ function normalizeKeyChanges(score = {}, measures = 1) {
   return deduped;
 }
 
+function normalizeTempoChanges(score = {}, measures = 1) {
+  const maxMeasure = Math.max(0, Number(measures || 1) - 1);
+  const sourceEvents = Array.isArray(score.tempoChanges)
+    ? score.tempoChanges
+    : [];
+
+  const normalized = sourceEvents
+    .filter((event) => event && typeof event === 'object')
+    .map((event) => ({
+      measure: Math.max(0, Math.min(maxMeasure, Math.round(Number(event.measure || 0)))),
+      tempo: normalizeTempoValue(event.tempo, 90)
+    }))
+    .sort((a, b) => a.measure - b.measure);
+
+  const deduped = [];
+  for (const event of normalized) {
+    if (deduped.length && deduped.at(-1).measure === event.measure) {
+      deduped[deduped.length - 1] = event;
+      continue;
+    }
+    deduped.push(event);
+  }
+
+  const firstEvent = deduped.find((event) => event.measure === 0) || null;
+  const initialTempo = normalizeTempoValue(firstEvent?.tempo ?? score.tempo ?? 90, 90);
+  if (!deduped.length || deduped[0].measure !== 0) {
+    deduped.unshift({ measure: 0, tempo: initialTempo });
+  }
+
+  deduped[0].tempo = initialTempo;
+  return deduped;
+}
+
 function normalizeTuplet(tuplet) {
   if (!tuplet || typeof tuplet !== 'object') return null;
   const count = Math.round(Number(tuplet.count));
@@ -57,13 +96,15 @@ export function normalizeScore(score = {}, options = {}) {
   const measures = Math.max(1, Number(score.measures || 4));
   const timeSignature = score.timeSignature || { beats: 4, beatType: 4 };
   const keyChanges = normalizeKeyChanges(score, measures);
+  const tempoChanges = normalizeTempoChanges(score, measures);
   return {
     title: score.title || defaultTitle,
     composer: score.composer || '',
     clef: normalizeClef(score.clef),
     key: { fifths: keyChanges[0].fifths },
     keyChanges,
-    tempo: Number(score.tempo || 90),
+    tempo: tempoChanges[0].tempo,
+    tempoChanges,
     measures,
     timeSignature: {
       beats: Number(timeSignature.beats || 4),

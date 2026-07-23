@@ -39,6 +39,103 @@ function activeFifthsAtMeasure(score, measure) {
   return active;
 }
 
+function normalizeTempo(value) {
+  const numeric = Math.round(Number(value || 90));
+  if (!Number.isFinite(numeric) || numeric <= 0) return 90;
+  return clamp(numeric, 20, 300);
+}
+
+function activeTempoAtMeasure(score, measure) {
+  const fallback = normalizeTempo(score?.tempo || 90);
+  const events = Array.isArray(score?.tempoChanges)
+    ? [...score.tempoChanges].sort((a, b) => Number(a.measure || 0) - Number(b.measure || 0))
+    : [{ measure: 0, tempo: fallback }];
+  let active = fallback;
+  for (const event of events) {
+    if (Number(event.measure || 0) > measure) break;
+    active = normalizeTempo(event.tempo);
+  }
+  return active;
+}
+
+function buildTempoTimeline(score) {
+  const beatsPerMeasure = Number(score.timeSignature?.beats || 4);
+  const totalBeats = Number(score.measures || 1) * beatsPerMeasure;
+  const fallback = normalizeTempo(score?.tempo || 90);
+  const raw = Array.isArray(score?.tempoChanges)
+    ? score.tempoChanges
+    : [{ measure: 0, tempo: fallback }];
+
+  const deduped = raw
+    .filter((event) => event && typeof event === 'object')
+    .map((event) => ({
+      measure: clamp(Math.round(Number(event.measure || 0)), 0, Math.max(0, Number(score.measures || 1) - 1)),
+      tempo: normalizeTempo(event.tempo)
+    }))
+    .sort((a, b) => a.measure - b.measure)
+    .reduce((list, event) => {
+      if (list.length && list.at(-1).measure === event.measure) {
+        list[list.length - 1] = event;
+      } else {
+        list.push(event);
+      }
+      return list;
+    }, []);
+
+  const initialTempo = deduped.find((event) => event.measure === 0)?.tempo ?? fallback;
+  if (!deduped.length || deduped[0].measure !== 0) deduped.unshift({ measure: 0, tempo: initialTempo });
+
+  const segments = [];
+  let offsetSeconds = 0;
+  for (let idx = 0; idx < deduped.length; idx++) {
+    const current = deduped[idx];
+    const next = deduped[idx + 1];
+    const startBeat = current.measure * beatsPerMeasure;
+    const endBeat = next ? next.measure * beatsPerMeasure : totalBeats;
+    const beatLength = Math.max(0, endBeat - startBeat);
+    const secondsPerBeat = 60 / normalizeTempo(current.tempo);
+    const durationSeconds = beatLength * secondsPerBeat;
+    segments.push({
+      startBeat,
+      endBeat,
+      tempo: normalizeTempo(current.tempo),
+      secondsPerBeat,
+      startOffsetSeconds: offsetSeconds,
+      endOffsetSeconds: offsetSeconds + durationSeconds
+    });
+    offsetSeconds += durationSeconds;
+  }
+
+  return {
+    beatsPerMeasure,
+    totalBeats,
+    totalDurationSeconds: offsetSeconds,
+    segments
+  };
+}
+
+function beatToOffsetSeconds(timeline, beat) {
+  const clampedBeat = clamp(Number(beat || 0), 0, timeline.totalBeats);
+  const segment = timeline.segments.find((candidate) => clampedBeat >= candidate.startBeat && clampedBeat <= candidate.endBeat)
+    || timeline.segments.at(-1);
+  if (!segment) return 0;
+  return segment.startOffsetSeconds + (clampedBeat - segment.startBeat) * segment.secondsPerBeat;
+}
+
+function spanSeconds(timeline, startBeat, durationBeats) {
+  const from = beatToOffsetSeconds(timeline, startBeat);
+  const to = beatToOffsetSeconds(timeline, startBeat + Math.max(0, Number(durationBeats || 0)));
+  return Math.max(0.08, to - from);
+}
+
+function offsetSecondsToBeat(timeline, elapsedSeconds) {
+  const clampedSeconds = clamp(Number(elapsedSeconds || 0), 0, timeline.totalDurationSeconds);
+  const segment = timeline.segments.find((candidate) => clampedSeconds >= candidate.startOffsetSeconds && clampedSeconds <= candidate.endOffsetSeconds)
+    || timeline.segments.at(-1);
+  if (!segment) return 0;
+  return segment.startBeat + (clampedSeconds - segment.startOffsetSeconds) / segment.secondsPerBeat;
+}
+
 function effectivePitch(score, note) {
   if (!note?.pitch) return null;
   const pitch = note.pitch;
@@ -134,13 +231,13 @@ export async function play(editor) {
       return;
     }
   }
-  const secondsPerBeat = 60 / score.tempo;
+  const timeline = buildTempoTimeline(score);
   const startAt = ctx.currentTime + 0.05;
   const playbackEvents = buildPlaybackEvents(score);
   editor.playback = {
     startAt,
-    secondsPerBeat,
-    totalBeats: score.measures * score.timeSignature.beats,
+    timeline,
+    totalBeats: timeline.totalBeats,
     score,
     events: playbackEvents
   };
@@ -151,8 +248,8 @@ export async function play(editor) {
     if (!pitch) continue;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    const start = startAt + event.startBeat * secondsPerBeat;
-    const dur = Math.max(0.08, event.duration * secondsPerBeat * 0.9);
+    const start = startAt + beatToOffsetSeconds(timeline, event.startBeat);
+    const dur = spanSeconds(timeline, event.startBeat, event.duration) * 0.9;
     osc.frequency.value = 440 * Math.pow(2, (pitchToMidi(pitch) - 69) / 12);
     osc.type = 'sine';
     gain.gain.setValueAtTime(0.0001, start);
@@ -182,7 +279,8 @@ export async function playNote(editor, note) {
       return;
     }
   }
-  const secondsPerBeat = 60 / editor.model.score.tempo;
+  const tempo = activeTempoAtMeasure(editor.model.score, Number(note.measure || 0));
+  const secondsPerBeat = 60 / tempo;
   const start = ctx.currentTime + 0.02;
   const dur = Math.max(0.12, note.duration * secondsPerBeat * 0.45);
   const pitch = effectivePitch(editor.model.score, note);
@@ -237,8 +335,11 @@ export function tickPlayback(editor) {
 
 export function getPlaybackPosition(editor) {
   if (!editor.playback || !editor.audioContext) return null;
-  const elapsedBeats = Math.max(0, (editor.audioContext.currentTime - editor.playback.startAt) / editor.playback.secondsPerBeat);
-  const totalBeats = editor.playback.totalBeats;
+  const timeline = editor.playback.timeline;
+  const elapsedSeconds = Math.max(0, editor.audioContext.currentTime - editor.playback.startAt);
+  if (elapsedSeconds >= timeline.totalDurationSeconds) return { done: true };
+  const elapsedBeats = offsetSecondsToBeat(timeline, elapsedSeconds);
+  const totalBeats = timeline.totalBeats;
   if (elapsedBeats >= totalBeats) return { done: true };
   const beatsPerMeasure = editor.playback.score.timeSignature.beats;
   const measure = clamp(Math.floor(elapsedBeats / beatsPerMeasure), 0, editor.playback.score.measures - 1);

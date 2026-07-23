@@ -109,6 +109,10 @@ Useful options:
     { "measure": 0, "fifths": 0 },
     { "measure": 4, "fifths": -2 }
   ],
+  "tempoChanges": [
+    { "measure": 0, "tempo": 90 },
+    { "measure": 8, "tempo": 120 }
+  ],
   "tempo": 90,
   "measures": 4,
   "timeSignature": { "beats": 4, "beatType": 4 },
