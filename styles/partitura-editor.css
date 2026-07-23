@@ -367,6 +367,11 @@
   font-size: 20px;
 }
 
+.partitura-key-signature {
+  font-family: Georgia, serif;
+  font-size: 24px;
+}
+
 .partitura-lyric {
   fill: var(--pe-muted);
   font-size: 12px;

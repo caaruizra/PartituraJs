@@ -19,3 +19,4 @@ export * from './music/clef.js';
 export * from './music/pitch.js';
 export * from './music/duration.js';
 export * from './music/accidental.js';
+export * from './music/key-signature.js';

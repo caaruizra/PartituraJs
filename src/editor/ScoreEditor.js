@@ -10,6 +10,7 @@ import {
   beatToX as beatToXFromLayout,
   buildBeamLayout as buildBeamLayoutFromLayout,
   buildMeasureLayout as buildMeasureLayoutFromLayout,
+  measureLeadingInset as measureLeadingInsetFromLayout,
   noteToX as noteToXFromLayout
 } from '../services/layout-engine.js';
 import {
@@ -406,7 +407,7 @@ export class ScoreEditor {
     const measureX = layout.starts[measure];
     const measureWidth = layout.widths[measure];
     const isSystemStart = measures[0] === measure;
-    const leadingInset = isSystemStart ? 90 : 26;
+    const leadingInset = measureLeadingInsetFromLayout(this, measure, isSystemStart);
     const trailingInset = isSystemStart ? 20 : 16;
     const usableStart = measureX + leadingInset;
     const usableWidth = Math.max(24, measureWidth - leadingInset - trailingInset);
@@ -628,6 +629,16 @@ export class ScoreEditor {
   setClef(clef) {
     this.pushHistory();
     this.model.setClef(clef);
+    this.hideContextMenu();
+    this.emitChange();
+    this.updateToolbar();
+    this.updateMeasureToolbar();
+    this.drawScore();
+  }
+
+  setKeySignatureAt(measure, fifths) {
+    this.pushHistory();
+    this.model.setKeyAtMeasure(measure, fifths);
     this.hideContextMenu();
     this.emitChange();
     this.updateToolbar();

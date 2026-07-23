@@ -1,6 +1,18 @@
 import { clamp } from '../core/utils.js';
 import { isDottedDuration, toggleDottedDuration } from '../music/duration.js';
 
+function parseKeySignatureInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) return clamp(Math.round(numeric), -7, 7);
+
+  if (/^[#♯]+$/.test(raw)) return clamp(raw.length, 0, 7);
+  if (/^[b♭]+$/i.test(raw)) return clamp(-raw.length, -7, 0);
+  return null;
+}
+
 function positionMenu(editor, event) {
   if (!editor.contextMenu) return;
   const containerRect = editor.container.getBoundingClientRect();
@@ -27,6 +39,15 @@ function handleMeasureAction(editor, action) {
   if (action === 'measure-insert-before') editor.insertMeasureAt(editor.contextMenuMeasure);
   if (action === 'measure-insert-after') editor.insertMeasureAt(editor.contextMenuMeasure + 1);
   if (action === 'measure-delete') editor.removeMeasureAt(editor.contextMenuMeasure);
+  if (action === 'measure-key-signature') {
+    const current = editor.model.getKeyAtMeasure(editor.contextMenuMeasure);
+    const input = window.prompt(editor.t('editor.keySignaturePrompt'), String(current));
+    if (input !== null) {
+      const fifths = parseKeySignatureInput(input);
+      if (fifths === null) window.alert(editor.t('editor.keySignatureInvalid'));
+      else editor.setKeySignatureAt(editor.contextMenuMeasure, fifths);
+    }
+  }
   return true;
 }
 
@@ -120,6 +141,7 @@ export function renderContextMenu(editor) {
       <div class="partitura-context-menu-group" data-context-group="measure">
         <button type="button" data-action="measure-insert-before">${editor.t('contextMenu.measureInsertBefore')}</button>
         <button type="button" data-action="measure-insert-after">${editor.t('contextMenu.measureInsertAfter')}</button>
+        <button type="button" data-action="measure-key-signature">${editor.t('contextMenu.measureKeySignature')}</button>
         <button type="button" data-action="measure-delete">${editor.t('contextMenu.measureDelete')}</button>
       </div>
       <div class="partitura-context-menu-divider"></div>

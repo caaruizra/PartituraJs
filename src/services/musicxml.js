@@ -134,9 +134,17 @@ function createParsedScore(scoreRoot, measureCount, defaultTitle = 'Untitled') {
     measures: Math.max(1, measureCount),
     clef: 'sol',
     key: { fifths: 0 },
+    keyChanges: [{ measure: 0, fifths: 0 }],
     timeSignature: { beats: 4, beatType: 4 },
     notes: []
   };
+}
+
+function upsertKeyChange(keyChanges, measure, fifths) {
+  const idx = keyChanges.findIndex((event) => event.measure === measure);
+  const next = { measure, fifths };
+  if (idx >= 0) keyChanges[idx] = next;
+  else keyChanges.push(next);
 }
 
 function applyTempo(scoreRoot, parsed) {
@@ -144,7 +152,7 @@ function applyTempo(scoreRoot, parsed) {
   if (Number.isFinite(firstSoundTempo) && firstSoundTempo > 0) parsed.tempo = firstSoundTempo;
 }
 
-function applyMeasureAttributes(attrs, parsed, currentDivisions) {
+function applyMeasureAttributes(attrs, parsed, currentDivisions, measureIndex) {
   if (!attrs) return currentDivisions;
   let divisions = currentDivisions;
   const parsedDivisions = numberOf(attrs, ':scope > divisions', Number.NaN);
@@ -156,7 +164,10 @@ function applyMeasureAttributes(attrs, parsed, currentDivisions) {
   if (Number.isFinite(beatType) && beatType > 0) parsed.timeSignature.beatType = beatType;
 
   const fifths = numberOf(attrs, ':scope > key > fifths', Number.NaN);
-  if (Number.isFinite(fifths)) parsed.key = { fifths };
+  if (Number.isFinite(fifths)) {
+    parsed.key = { fifths };
+    upsertKeyChange(parsed.keyChanges, measureIndex, fifths);
+  }
 
   const clefSign = textOf(attrs, ':scope > clef > sign');
   const clefLine = numberOf(attrs, ':scope > clef > line', 0);
@@ -264,7 +275,7 @@ export function importMusicXML(xmlSource, options = {}) {
   for (let measureIndex = 0; measureIndex < measures.length; measureIndex++) {
     const measure = measures[measureIndex];
     const attrs = measure.querySelector(':scope > attributes');
-    divisions = applyMeasureAttributes(attrs, parsed, divisions);
+    divisions = applyMeasureAttributes(attrs, parsed, divisions, measureIndex);
     parsed.notes.push(...parseMeasureNotes(measure, measureIndex, divisions, tupletState));
   }
 
@@ -280,6 +291,9 @@ export function exportMusicXML(scoreInput) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&apos;');
+
+  const keyChanges = Array.isArray(score.keyChanges) ? score.keyChanges : [{ measure: 0, fifths: score.key?.fifths || 0 }];
+  const keyByMeasure = new Map(keyChanges.map((event) => [Number(event.measure || 0), Number(event.fifths || 0)]));
 
   const notesByMeasure = Array.from({ length: score.measures }, () => []);
   for (const note of score.notes) {
@@ -302,13 +316,21 @@ export function exportMusicXML(scoreInput) {
 
   const xmlMeasures = notesByMeasure.map((notes, measureIndex) => {
     const clef = clefConfig(score.clef);
-    const attributes = measureIndex === 0 ? `
-      <attributes>
-        <divisions>${divisions}</divisions>
-        <key><fifths>${score.key.fifths || 0}</fifths></key>
-        <time><beats>${score.timeSignature.beats}</beats><beat-type>${score.timeSignature.beatType}</beat-type></time>
-        <clef><sign>${clef.xmlSign}</sign><line>${clef.xmlLine}</line></clef>
-      </attributes>` : '';
+    const parts = [];
+    const hasKeyChange = keyByMeasure.has(measureIndex);
+    const keyFifths = keyByMeasure.get(measureIndex);
+    if (measureIndex === 0) {
+      const firstFifths = keyFifths ?? score.key.fifths ?? 0;
+      parts.push(
+        `<divisions>${divisions}</divisions>`,
+        `<key><fifths>${firstFifths}</fifths></key>`,
+        `<time><beats>${score.timeSignature.beats}</beats><beat-type>${score.timeSignature.beatType}</beat-type></time>`,
+        `<clef><sign>${clef.xmlSign}</sign><line>${clef.xmlLine}</line></clef>`
+      );
+    } else if (hasKeyChange) {
+      parts.push(`<key><fifths>${keyFifths}</fifths></key>`);
+    }
+    const attributes = parts.length ? `\n      <attributes>${parts.join('')}</attributes>` : '';
 
     const xmlNotes = notes.map((note) => {
       const dur = Math.max(1, Math.round(note.duration * divisions));

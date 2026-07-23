@@ -10,6 +10,66 @@ export class ScoreModel {
     this.normalizeAllMeasureBeats();
   }
 
+  normalizeKeyChanges() {
+    const maxMeasure = Math.max(0, this.score.measures - 1);
+    const events = Array.isArray(this.score.keyChanges)
+      ? this.score.keyChanges
+        .filter((event) => event && typeof event === 'object')
+        .map((event) => ({
+          measure: clamp(Math.round(Number(event.measure || 0)), 0, maxMeasure),
+          fifths: clamp(Math.round(Number(event.fifths || 0)), -7, 7)
+        }))
+      : [];
+
+    events.sort((a, b) => a.measure - b.measure);
+    const deduped = [];
+    for (const event of events) {
+      if (deduped.length && deduped.at(-1).measure === event.measure) {
+        deduped[deduped.length - 1] = event;
+      } else {
+        deduped.push(event);
+      }
+    }
+
+    const firstEvent = deduped.find((event) => event.measure === 0) || null;
+    const initial = clamp(
+      Math.round(Number(firstEvent?.fifths ?? this.score.key?.fifths ?? 0)),
+      -7,
+      7
+    );
+    if (!deduped.length || deduped[0].measure !== 0) deduped.unshift({ measure: 0, fifths: initial });
+    deduped[0].fifths = initial;
+    this.score.keyChanges = deduped;
+    this.score.key = { fifths: deduped[0].fifths };
+  }
+
+  hasKeyChangeAtMeasure(measure) {
+    const target = clamp(Math.round(Number(measure || 0)), 0, this.score.measures - 1);
+    return (this.score.keyChanges || []).some((event) => event.measure === target);
+  }
+
+  getKeyAtMeasure(measure) {
+    const target = clamp(Math.round(Number(measure || 0)), 0, this.score.measures - 1);
+    let active = clamp(Math.round(Number(this.score.key?.fifths || 0)), -7, 7);
+    for (const event of this.score.keyChanges || []) {
+      if (event.measure > target) break;
+      active = clamp(Math.round(Number(event.fifths || 0)), -7, 7);
+    }
+    return active;
+  }
+
+  setKeyAtMeasure(measure, fifths) {
+    const target = clamp(Math.round(Number(measure || 0)), 0, this.score.measures - 1);
+    const normalizedFifths = clamp(Math.round(Number(fifths || 0)), -7, 7);
+    const keyChanges = Array.isArray(this.score.keyChanges) ? [...this.score.keyChanges] : [];
+    const idx = keyChanges.findIndex((event) => event.measure === target);
+    if (idx >= 0) keyChanges[idx] = { measure: target, fifths: normalizedFifths };
+    else keyChanges.push({ measure: target, fifths: normalizedFifths });
+    this.score.keyChanges = keyChanges;
+    this.normalizeKeyChanges();
+    return normalizedFifths;
+  }
+
   normalizeTuplet(tuplet, fallback = {}) {
     if (!tuplet || typeof tuplet !== 'object') return null;
     const count = Math.round(Number(tuplet.count));
@@ -275,6 +335,7 @@ export class ScoreModel {
   setScore(score, options = {}) {
     this.score = normalizeScore(score, options);
     this.normalizeAllMeasureBeats();
+    this.normalizeKeyChanges();
   }
 
   setClef(clef) {
@@ -284,10 +345,18 @@ export class ScoreModel {
 
   insertMeasure(index) {
     const insertAt = clamp(Number(index || 0), 0, this.score.measures);
+    const inheritedFifths = this.getKeyAtMeasure(Math.min(insertAt, this.score.measures - 1));
     for (const note of this.score.notes) {
       if (note.measure >= insertAt) note.measure += 1;
     }
+    this.score.keyChanges = (this.score.keyChanges || []).map((event) => (
+      event.measure >= insertAt
+        ? { ...event, measure: event.measure + 1 }
+        : event
+    ));
     this.score.measures += 1;
+    this.setKeyAtMeasure(insertAt, inheritedFifths);
+    this.normalizeKeyChanges();
     this.sort();
     return insertAt;
   }
@@ -299,8 +368,16 @@ export class ScoreModel {
     for (const note of this.score.notes) {
       if (note.measure > removeAt) note.measure -= 1;
     }
+    this.score.keyChanges = (this.score.keyChanges || [])
+      .filter((event) => event.measure !== removeAt)
+      .map((event) => (
+        event.measure > removeAt
+          ? { ...event, measure: event.measure - 1 }
+          : event
+      ));
     this.score.measures -= 1;
     this.normalizeAllMeasureBeats();
+    this.normalizeKeyChanges();
     this.normalizeLigatures();
     return true;
   }

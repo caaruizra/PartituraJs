@@ -4,6 +4,55 @@ import { createSvg } from '../render/svg.js';
 
 const global = typeof window !== 'undefined' ? window : globalThis;
 
+const SHARP_ORDER = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+const FLAT_ORDER = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+
+function normalizeFifths(value) {
+  const numeric = Math.round(Number(value || 0));
+  if (!Number.isFinite(numeric)) return 0;
+  return clamp(numeric, -7, 7);
+}
+
+function keyAlterByStep(fifths) {
+  const normalized = normalizeFifths(fifths);
+  const map = new Map();
+  if (normalized > 0) {
+    for (let idx = 0; idx < normalized; idx++) map.set(SHARP_ORDER[idx], 1);
+    return map;
+  }
+  if (normalized < 0) {
+    for (let idx = 0; idx < Math.abs(normalized); idx++) map.set(FLAT_ORDER[idx], -1);
+  }
+  return map;
+}
+
+function activeFifthsAtMeasure(score, measure) {
+  const fallback = normalizeFifths(score?.key?.fifths || 0);
+  const events = Array.isArray(score?.keyChanges)
+    ? [...score.keyChanges].sort((a, b) => Number(a.measure || 0) - Number(b.measure || 0))
+    : [{ measure: 0, fifths: fallback }];
+  let active = fallback;
+  for (const event of events) {
+    if (Number(event.measure || 0) > measure) break;
+    active = normalizeFifths(event.fifths);
+  }
+  return active;
+}
+
+function effectivePitch(score, note) {
+  if (!note?.pitch) return null;
+  const pitch = note.pitch;
+  const explicitAlter = Number(pitch.alter || 0);
+  if (explicitAlter !== 0) return { ...pitch, alter: explicitAlter };
+
+  const fifths = activeFifthsAtMeasure(score, Number(note.measure || 0));
+  const byStep = keyAlterByStep(fifths);
+  return {
+    ...pitch,
+    alter: byStep.get(pitch.step) || 0
+  };
+}
+
 function noteOrder(score, a, b) {
   const beatsPerMeasure = score.timeSignature.beats;
   const absA = (a.measure * beatsPerMeasure) + a.beat;
@@ -11,8 +60,9 @@ function noteOrder(score, a, b) {
   return absA - absB;
 }
 
-function pitchKey(note) {
-  return note?.pitch ? String(pitchToMidi(note.pitch)) : '';
+function pitchKey(score, note) {
+  const pitch = effectivePitch(score, note);
+  return pitch ? String(pitchToMidi(pitch)) : '';
 }
 
 function buildPlaybackEvents(score) {
@@ -32,7 +82,7 @@ function buildPlaybackEvents(score) {
   };
 
   for (const note of notes) {
-    const key = pitchKey(note);
+    const key = pitchKey(score, note);
     const queue = openByPitch.get(key) || [];
     let chain = null;
 
@@ -97,11 +147,13 @@ export async function play(editor) {
   editor.playbackNodes = [];
   for (const event of playbackEvents) {
     const note = event.note;
+    const pitch = effectivePitch(score, note);
+    if (!pitch) continue;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     const start = startAt + event.startBeat * secondsPerBeat;
     const dur = Math.max(0.08, event.duration * secondsPerBeat * 0.9);
-    osc.frequency.value = 440 * Math.pow(2, (pitchToMidi(note.pitch) - 69) / 12);
+    osc.frequency.value = 440 * Math.pow(2, (pitchToMidi(pitch) - 69) / 12);
     osc.type = 'sine';
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(0.16, start + 0.01);
@@ -133,9 +185,11 @@ export async function playNote(editor, note) {
   const secondsPerBeat = 60 / editor.model.score.tempo;
   const start = ctx.currentTime + 0.02;
   const dur = Math.max(0.12, note.duration * secondsPerBeat * 0.45);
+  const pitch = effectivePitch(editor.model.score, note);
+  if (!pitch) return;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.frequency.value = 440 * Math.pow(2, (pitchToMidi(note.pitch) - 69) / 12);
+  osc.frequency.value = 440 * Math.pow(2, (pitchToMidi(pitch) - 69) / 12);
   osc.type = 'sine';
   gain.gain.setValueAtTime(0.0001, start);
   gain.gain.exponentialRampToValueAtTime(0.16, start + 0.01);

@@ -105,6 +105,10 @@ Useful options:
   "title": "My score",
   "composer": "Me",
   "clef": "treble",
+  "keyChanges": [
+    { "measure": 0, "fifths": 0 },
+    { "measure": 4, "fifths": -2 }
+  ],
   "tempo": 90,
   "measures": 4,
   "timeSignature": { "beats": 4, "beatType": 4 },
@@ -129,7 +133,7 @@ Useful options:
 
 ## Limitations of this version
 
-This version is an editable foundation, not a complete music notation engine. It does not yet include automatic rests, visual key signatures, multiple voices, advanced beaming, complex compound meters, or full MusicXML coverage.
+This version is an editable foundation, not a complete music notation engine. It does not yet include automatic rests, multiple voices, advanced beaming, complex compound meters, or full MusicXML coverage.
 
 ## Run the demo
 

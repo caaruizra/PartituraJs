@@ -1,4 +1,5 @@
 import { clefConfig } from '../music/clef.js';
+import { keySignatureAccidentals, keySignatureWidth } from '../music/key-signature.js';
 import { noteSortValue } from '../music/pitch.js';
 import { createSvg } from './svg.js';
 
@@ -205,6 +206,24 @@ function drawTuplets(editor, systemMeasures, staffTop) {
   return group;
 }
 
+function drawKeySignature(editor, fifths, startX, staffTop) {
+  const group = createSvg('g', { class: 'partitura-key-signature-group' });
+  const accidentals = keySignatureAccidentals(fifths, editor.model.score.clef);
+  const spacing = 10;
+  for (let idx = 0; idx < accidentals.length; idx++) {
+    const accidental = accidentals[idx];
+    group.appendChild(createSvg('text', {
+      x: startX + idx * spacing,
+      y: editor.pitchToY(accidental.pitch, staffTop) + 5,
+      class: 'partitura-key-signature'
+    }, accidental.sign));
+  }
+  return {
+    group,
+    width: keySignatureWidth(fifths, spacing)
+  };
+}
+
 export function drawScore(editor) {
   editor.svg.innerHTML = '';
   const s = editor.options;
@@ -307,16 +326,29 @@ export function drawScore(editor) {
       class: 'partitura-clef'
     }, clefConfig(score.clef).glyph));
 
+    const systemFifths = editor.model.getKeyAtMeasure(systemStart);
+    const systemKey = drawKeySignature(editor, systemFifths, editor.measureLayout.starts[systemStart] + 82, top);
+    editor.svg.appendChild(systemKey.group);
+
+    const timeX = editor.measureLayout.starts[systemStart] + 105 + systemKey.width;
+
     editor.svg.appendChild(createSvg('text', {
-      x: editor.measureLayout.starts[systemStart] + 48,
+      x: timeX,
       y: top + 25,
       class: 'partitura-time'
     }, String(score.timeSignature.beats)));
     editor.svg.appendChild(createSvg('text', {
-      x: editor.measureLayout.starts[systemStart] + 48,
+      x: timeX,
       y: top + 44,
       class: 'partitura-time'
     }, String(score.timeSignature.beatType)));
+
+    for (const measure of systemMeasures) {
+      if (measure === systemStart || !editor.model.hasKeyChangeAtMeasure(measure)) continue;
+      const fifths = editor.model.getKeyAtMeasure(measure);
+      const midKey = drawKeySignature(editor, fifths, editor.measureLayout.starts[measure] + 8, top);
+      editor.svg.appendChild(midKey.group);
+    }
 
     const beatGuideGroup = createSvg('g', { class: 'partitura-beat-guides' });
     for (const measure of systemMeasures) {

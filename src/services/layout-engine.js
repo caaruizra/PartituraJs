@@ -1,5 +1,20 @@
 import { noteSortValue } from '../music/pitch.js';
 import { durationFlagCount } from '../music/duration.js';
+import { keySignatureWidth } from '../music/key-signature.js';
+
+function keyWidthForMeasure(editor, measure) {
+  const model = editor.model;
+  if (!model || typeof model.getKeyAtMeasure !== 'function') return 0;
+  return keySignatureWidth(model.getKeyAtMeasure(measure));
+}
+
+export function measureLeadingInset(editor, measure, isSystemStart = false) {
+  if (isSystemStart) return 90 + keyWidthForMeasure(editor, measure) + 12;
+  const hasChange = typeof editor.model?.hasKeyChangeAtMeasure === 'function'
+    ? editor.model.hasKeyChangeAtMeasure(measure)
+    : false;
+  return hasChange ? 26 + keyWidthForMeasure(editor, measure) + 10 : 26;
+}
 
 function clampSlope(value, maxAbs = 0.35) {
   const limit = Math.max(0, Number(maxAbs) || 0.35);
@@ -32,9 +47,14 @@ export function buildMeasureLayout(editor) {
 
   for (let measure = 0; measure < score.measures; measure++) {
     const notes = notesByMeasure[measure];
-    const baseWidth = Math.max(editor.options.measureWidth, 42 + (notes.length + 1) * minSlotWidth);
+    const hasKeyChange = typeof editor.model?.hasKeyChangeAtMeasure === 'function'
+      ? editor.model.hasKeyChangeAtMeasure(measure)
+      : false;
+    const inlineKeyWidth = hasKeyChange ? keyWidthForMeasure(editor, measure) + 10 : 0;
+    const baseWidth = Math.max(editor.options.measureWidth, 42 + (notes.length + 1) * minSlotWidth + inlineKeyWidth);
     measureBaseWidths[measure] = baseWidth;
-    measureFirstWidths[measure] = Math.max(baseWidth, 90 + 42 + (notes.length + 1) * minSlotWidth);
+    const firstInset = measureLeadingInset(editor, measure, true);
+    measureFirstWidths[measure] = Math.max(baseWidth, firstInset + 42 + (notes.length + 1) * minSlotWidth);
   }
 
   const startNewSystem = () => {
@@ -90,7 +110,7 @@ export function buildMeasureLayout(editor) {
     for (const measure of system.measureIndices) {
       const notes = notesByMeasure[measure];
       const isSystemStart = measure === systemStartMeasure;
-      const leadingInset = isSystemStart ? 90 : 26;
+      const leadingInset = measureLeadingInset(editor, measure, isSystemStart);
       const trailingInset = isSystemStart ? 20 : 16;
       const usableStart = starts[measure] + leadingInset;
       const usableWidth = Math.max(24, widths[measure] - leadingInset - trailingInset);
@@ -117,7 +137,7 @@ export function beatToX(editor, measure, beat) {
   const measureX = layout.starts[measure] ?? editor.options.staffLeft;
   const measureWidth = layout.widths[measure] ?? editor.options.measureWidth;
   const isSystemStart = (layout.systems || []).some((system) => system.measureIndices?.[0] === measure);
-  const leadingInset = isSystemStart ? 90 : 26;
+  const leadingInset = measureLeadingInset(editor, measure, isSystemStart);
   const trailingInset = isSystemStart ? 20 : 16;
   const usableStart = measureX + leadingInset;
   const usableWidth = Math.max(24, measureWidth - leadingInset - trailingInset);

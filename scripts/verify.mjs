@@ -144,6 +144,23 @@ function main() {
     assert(xml.includes('<tuplet type="stop" number="1"/>'), 'Expected tuplet stop notation in MusicXML');
   });
 
+  run('MusicXML exports key signature changes', () => {
+    const xml = requireApi.exportMusicXML({
+      measures: 3,
+      timeSignature: { beats: 4, beatType: 4 },
+      keyChanges: [
+        { measure: 0, fifths: 2 },
+        { measure: 1, fifths: -3 }
+      ],
+      notes: [
+        { measure: 0, beat: 0, duration: 1, pitch: { step: 'C', octave: 4, alter: 0 } }
+      ]
+    });
+
+    assert(xml.includes('<measure number="2">'), 'Expected second measure in export');
+    assert(xml.includes('<key><fifths>-3</fifths></key>'), 'Expected key change attributes in export');
+  });
+
   run('Browser IIFE bundle exposes PartituraJS symbol', () => {
     const source = readBrowserBundle();
     assert(source.includes('var PartituraJS'), 'IIFE PartituraJS symbol not found');

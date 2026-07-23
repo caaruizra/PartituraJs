@@ -9,6 +9,8 @@ export const translations = {
       invalidContainer: 'ScoreEditor necesita un contenedor válido.',
       lyricPrompt: 'Letra/sílaba para esta nota:',
       titlePrompt: 'Título de la partitura:',
+      keySignaturePrompt: 'Armadura para este compás (usa -7..7, ####, bbbb, ♯♯ o ♭♭):',
+      keySignatureInvalid: 'Armadura inválida. Usa un número entre -7 y 7, o #/b repetidos.',
       tupletPrompt: 'Grupo de valoración especial (2-7, o nombre: dosillo, tresillo, cuatrillo, cinquillo, seisillo, septillo):',
       tupletPromptDefault: '3',
       tupletInvalid: 'Valor inválido. Usa 2, 3, 4, 5, 6 o 7 (o su nombre).',
@@ -45,6 +47,7 @@ export const translations = {
     contextMenu: {
       measureInsertBefore: 'Agregar compás antes',
       measureInsertAfter: 'Agregar compás después',
+      measureKeySignature: 'Cambiar armadura…',
       measureDelete: 'Eliminar compás',
       noteDelete: 'Eliminar nota',
       noteToggleDotAdd: 'Agregar puntillo',
@@ -78,6 +81,8 @@ export const translations = {
       invalidContainer: 'ScoreEditor needs a valid container.',
       lyricPrompt: 'Lyric/syllable for this note:',
       titlePrompt: 'Score title:',
+      keySignaturePrompt: 'Key signature for this measure (use -7..7, ####, bbbb, ♯♯, or ♭♭):',
+      keySignatureInvalid: 'Invalid key signature. Use a value between -7 and 7, or repeated #/b.',
       tupletPrompt: 'Tuplet value (2-7, or name: duplet, triplet, quadruplet, quintuplet, sextuplet, septuplet):',
       tupletPromptDefault: '3',
       tupletInvalid: 'Invalid value. Use 2, 3, 4, 5, 6, or 7 (or its name).',
@@ -114,6 +119,7 @@ export const translations = {
     contextMenu: {
       measureInsertBefore: 'Insert measure before',
       measureInsertAfter: 'Insert measure after',
+      measureKeySignature: 'Change key signature…',
       measureDelete: 'Delete measure',
       noteDelete: 'Delete note',
       noteToggleDotAdd: 'Add dot',
